@@ -236,12 +236,33 @@ function seed(){
 }
 
 /* ================= AUTH ================= */
-let needsPassword=false;
+let needsPassword=false,authNotice='';
 async function initAuth(){
   if(DEMO){demo.load();const s=sessionStorage.getItem('pmp_demo_session');if(s){session=JSON.parse(s);}return;}
   sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
   const h=location.hash||'';
-  if(/type=(invite|recovery|magiclink|signup)/.test(h)||/access_token=/.test(h)){needsPassword=/type=(invite|recovery)/.test(h);}
+  // 1) Scanner-safe links: #/auth?token_hash=...&type=recovery|invite|magiclink. The token is only consumed when this page verifies it,
+  //    so an email client's link-preview fetch cannot burn the one-time link (the hosted verify URL would).
+  const th=h.match(/token_hash=([^&]+)/),tt=h.match(/[?&]type=(invite|recovery|magiclink|signup|email)/);
+  if(th){
+    const type=tt?tt[1]:'recovery';
+    try{
+      const {data,error}=await sb.auth.verifyOtp({token_hash:decodeURIComponent(th[1]),type});
+      history.replaceState(null,'',location.pathname);
+      if(error)throw error;
+      needsPassword=(type==='invite'||type==='recovery');
+      if(!needsPassword&&data&&data.session)await hydrate(data.session.user);
+      sb.auth.onAuthStateChange(async(ev)=>{if(ev==='SIGNED_OUT'){session=null;render();}});
+      return;
+    }catch(ex){needsPassword=false;authNotice='This sign-in link is invalid or has already been used. Use "Forgot password?" below to get a fresh one.';}
+  }else if(/error_description=/.test(h)){
+    // 2) Error returned by the hosted verify endpoint (e.g. link already consumed by a mail scanner)
+    const em=h.match(/error_description=([^&]+)/);
+    authNotice=decodeURIComponent(em[1].replace(/\+/g,' '))+'. Use "Forgot password?" below to request a fresh link.';history.replaceState(null,'',location.pathname);
+  }else if(/type=(invite|recovery|magiclink|signup)/.test(h)||/access_token=/.test(h)){
+    // 3) Legacy implicit-flow links (#access_token=...&type=recovery)
+    needsPassword=/type=(invite|recovery)/.test(h);
+  }
   const {data}=await sb.auth.getSession();
   if(data.session){if(needsPassword){session=null;return;}await hydrate(data.session.user);}
   sb.auth.onAuthStateChange(async(ev,s)=>{if(ev==='SIGNED_OUT'){session=null;render();}if(ev==='PASSWORD_RECOVERY'){needsPassword=true;render();}});
@@ -370,6 +391,7 @@ async function render(){
 function loginView(){return `<div class="login"><form class="box" id="login-form">
   <div class="brand"><span class="mark">NP</span>PMP Clinician Portal</div>
   <p class="muted small">Authorised clinicians only. All access is logged.</p>
+  ${authNotice?'<div class="notice bad">'+authNotice.replace(/</g,'&lt;')+'</div>':''}
   ${DEMO?'<div class="notice warn"><b>Demo mode.</b> No backend configured. Sign in with any email and the password <code>demo-pmp</code>. Data stays in this browser. Do not enter real patient information.</div>':''}
   <label>Email<input type="email" id="l-email" autocomplete="username" required></label>
   <label>Password<input type="password" id="l-pw" autocomplete="current-password" required></label>
