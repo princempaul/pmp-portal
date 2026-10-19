@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Secure messages · PMP Healthcare</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Cormorant+Garamond:wght@500;600&display=swap">
+<script>
+window.PMP_SECURE_CONFIG = { functionsUrl: "https://rbupsgbmqhbvycfjphbf.supabase.co/functions/v1" }; // e.g. "https://abcd1234.functions.supabase.co" (DEPLOY.md step 3)
+</script>
+<style>
+:root{--mid:#0c1626;--ivory:#f8f5ef;--gold:#c6a46a;--gold-deep:#9f7f47;--ink:#141b26;--muted:#5e6672;--line:#e2dbcd;--ok:#2e7d4f;--bad:#b3261e;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ivory);color:var(--ink);font-family:Manrope,-apple-system,"Segoe UI",Arial,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+header{background:var(--mid);color:#fff;padding:1rem max(16px,env(safe-area-inset-left,0px))}
+header .wrap{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:.7rem;font-family:"Cormorant Garamond",Georgia,serif;font-size:1.35rem;font-weight:600}
+header .mark{width:32px;height:32px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;font-family:Manrope,sans-serif;font-size:.58rem;font-weight:800;letter-spacing:.12em;color:var(--gold)}
+main{max-width:760px;margin:0 auto;padding:1.5rem max(16px,env(safe-area-inset-left,0px)) 4rem}
+h1{font-family:"Cormorant Garamond",Georgia,serif;font-weight:500;font-size:1.9rem;margin:0 0 .4rem}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:1.3rem;margin-bottom:1rem}
+label{display:grid;gap:.3rem;font-size:.74rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+input,textarea{font:inherit;font-size:16px;min-height:48px;padding:.7rem .8rem;border:1px solid var(--line);border-radius:6px;width:100%;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:400}
+textarea{min-height:120px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.7rem 1.3rem;border-radius:6px;border:0;background:var(--gold);color:var(--mid);font-weight:700;cursor:pointer;text-decoration:none;font-size:1rem}
+.btn.dark{background:var(--mid);color:#fff}
+.btn[disabled]{opacity:.5}
+.muted{color:var(--muted)}.small{font-size:.86rem}
+.err{background:#fbe9e7;color:var(--bad);border:1px solid #f1c2bd;border-radius:6px;padding:.7rem .9rem;margin-top:.8rem}
+.ok{background:#e6f3ea;color:var(--ok);border:1px solid #bfe0c9;border-radius:6px;padding:.7rem .9rem}
+.msg{border-left:3px solid var(--line);padding:.6rem 0 .6rem 1rem;margin-bottom:1rem}
+.msg.clin{border-color:var(--gold)}
+.msg .who{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.msg .body{white-space:pre-wrap;margin-top:.3rem}
+.msg a.att{display:inline-block;margin-top:.5rem;font-weight:600}
+.inv{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.8rem 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.inv b{font-family:"Cormorant Garamond",Georgia,serif;font-size:1.4rem}
+.hidden{display:none}
+footer{text-align:center;color:var(--muted);font-size:.78rem;padding:1rem}
+</style>
+</head>
+<body>
+<header><div class="wrap"><span class="mark">NP</span>PMP Healthcare · Secure messages</div></header>
+<main>
+  <div id="gate" class="card">
+    <h1>Confirm who you are</h1>
+    <p class="muted small">This page holds a private message from your Nurse Practitioner. To open it, enter the <b>patient's</b> date of birth. The link works for 14 days and locks after five wrong attempts.</p>
+    <form id="gate-form" style="display:grid;gap:1rem;margin-top:1rem">
+      <label>Patient's date of birth<input type="date" id="dob" required></label>
+      <button class="btn" type="submit" id="open">Open message</button>
+      <div id="gate-err" class="err hidden"></div>
+    </form>
+  </div>
+  <div id="thread" class="hidden">
+    <div class="card">
+      <h1 id="subject"></h1>
+      <p class="muted small" id="pname"></p>
+      <div id="messages"></div>
+      <form id="reply-form" style="display:grid;gap:.8rem;margin-top:1rem">
+        <label>Reply<textarea id="reply" placeholder="Write your reply. For emergencies call 911; this inbox is not monitored around the clock."></textarea></label>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap"><button class="btn dark" type="submit">Send reply</button></div>
+        <div id="reply-ok" class="ok hidden">Reply sent. The clinic has been notified.</div>
+        <div id="reply-err" class="err hidden"></div>
+      </form>
+    </div>
+    <div class="card hidden" id="invoices"><h1 style="font-size:1.4rem">Payments</h1><div id="inv-list"></div><p class="muted small">Pay by Interac e-Transfer (Autodeposit, no security question). A receipt with the provider's College of Nurses of Ontario registration number follows for your insurance claim.</p></div>
+  </div>
+  <div id="status" class="card hidden"></div>
+  <p class="muted small">Privacy: this page is served over an encrypted connection and does not store anything on your device. Do not forward the link. Questions: clinic@pmphealthcare.ca</p>
+</main>
+<footer>PMP Healthcare Corp. · Sarnia, Ontario · Nurse Practitioner services are not insured by OHIP.</footer>
+<script>
+(function(){
+  const cfg=window.PMP_SECURE_CONFIG||{};const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const hash=location.hash.replace(/^#/,'');
+  if(/^paid=/.test(hash)){$('#gate').classList.add('hidden');$('#status').classList.remove('hidden');$('#status').innerHTML=`<h1>Thank you</h1><p>Payment for invoice <b>${esc(hash.slice(5))}</b> was received. A receipt is on its way to your email. You can close this page.</p>`;return;}
+  if(/^cancelled=/.test(hash)){$('#gate').classList.add('hidden');$('#status').classList.remove('hidden');$('#status').innerHTML=`<h1>Payment not completed</h1><p>Invoice <b>${esc(hash.slice(10))}</b> is still open. You can return to the payment link any time, or pay by Interac e-Transfer to clinic@pmphealthcare.ca with the invoice number in the message.</p>`;return;}
+  const token=hash;
+  if(!token){$('#gate').innerHTML='<h1>Link missing</h1><p class="muted">Open this page from the link in your email.</p>';return;}
+  let dob='';
+  async function call(body){
+    if(!cfg.functionsUrl){ // demo preview
+      if(token.startsWith('demo')){return {ok:true,thread:{subject:'Follow-up after your visit'},patient_name:'Sample Patient',messages:[{sender:'clinician',sender_name:'PMP Healthcare',body:'Your blood pressure readings look well controlled. Please continue amlodipine 5 mg daily and book a follow-up in 3 months. Your lab requisition is attached.',created_at:new Date().toISOString(),attachment:{filename:'requisition.pdf',url:'#'}}],invoices:[{number:'PMP-1001',description:'Virtual visit, 30 min',amount_cents:9500,tax_cents:0,status:'sent',pay_url:'#'}]};}
+      return {ok:false,error:'This page is not connected to a clinic server yet.'};
+    }
+    const r=await fetch(cfg.functionsUrl+'/secure-message-access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({token,dob},body))});
+    return r.json().catch(()=>({ok:false,error:'Server error'}));
+  }
+  function draw(d){
+    $('#gate').classList.add('hidden');$('#thread').classList.remove('hidden');
+    $('#subject').textContent=d.thread.subject;$('#pname').textContent='Patient: '+d.patient_name;
+    $('#messages').innerHTML=d.messages.map(m=>`<div class="msg ${m.sender==='clinician'?'clin':''}"><div class="who">${esc(m.sender==='clinician'?'PMP Healthcare':(m.sender_name||'You'))} · ${new Date(m.created_at).toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'})}</div><div class="body">${esc(m.body)}</div>${m.attachment?`<a class="att" href="${esc(m.attachment.url)}" target="_blank" rel="noopener">Open attachment: ${esc(m.attachment.filename)}</a>`:''}</div>`).join('');
+    if(d.invoices&&d.invoices.length){$('#invoices').classList.remove('hidden');$('#inv-list').innerHTML=d.invoices.map(i=>`<div class="inv"><div><div class="small muted">Invoice ${esc(i.number)}</div><div>${esc(i.description)}</div></div><div style="display:flex;align-items:center;gap:1rem"><b>$${((i.amount_cents+(i.tax_cents||0))/100).toFixed(2)}</b>${i.pay_url?`<a class="btn" href="${esc(i.pay_url)}">Pay now</a>`:`<span class="small">Interac e-Transfer to <b>clinic@pmphealthcare.ca</b><br>message: <b>${esc(i.number)}</b></span>`}</div></div>`).join('');}
+  }
+  $('#gate-form').addEventListener('submit',async e=>{e.preventDefault();dob=$('#dob').value;$('#open').disabled=true;$('#gate-err').classList.add('hidden');const d=await call({action:'open'});$('#open').disabled=false;if(!d.ok){$('#gate-err').textContent=d.error||'Could not open';$('#gate-err').classList.remove('hidden');return;}draw(d);});
+  $('#reply-form').addEventListener('submit',async e=>{e.preventDefault();const body=$('#reply').value.trim();if(!body)return;$('#reply-ok').classList.add('hidden');$('#reply-err').classList.add('hidden');const d=await call({action:'reply',body});if(!d.ok){$('#reply-err').textContent=d.error||'Could not send';$('#reply-err').classList.remove('hidden');return;}$('#reply').value='';$('#reply-ok').classList.remove('hidden');draw(d);$('#reply-ok').classList.remove('hidden');});
+})();
+</script>
+</body>
+</html>

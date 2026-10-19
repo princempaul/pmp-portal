@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>PMP Clinician Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+/* ======== CONFIGURATION ========
+   Leave supabaseUrl empty to run in DEMO mode (browser-only, sample data, no real PHI).
+   Fill in after creating the Supabase project (see DEPLOY.md). */
+window.PMP_CONFIG = {
+  supabaseUrl: "https://rbupsgbmqhbvycfjphbf.supabase.co",
+  supabaseAnonKey: "sb_publishable_3W8vUBj59OTTk3m7uPIVZw_0IW4IGsr",
+  clinic: {
+    name: "PMP Healthcare Corp.",
+    address: "Sarnia, Ontario",
+    phone: "",
+    fax: "",
+    email: "clinic@pmphealthcare.ca",
+    website: "pmphealthcare.ca"
+  },
+  videoProvider: "auto",  // "daily" when the Daily function is configured, "jitsi" interim, "auto" picks
+  portalUrl: "https://app.pmphealthcare.ca",
+  payments: { mode: "etransfer", etransferEmail: "clinic@pmphealthcare.ca", autodeposit: true, cardLinks: false }  // set cardLinks:true when Stripe is configured
+};
+</script>
+<style>
+/* App shell: dense clinical UI in the site's midnight / ivory / gold family. */
+:root{
+  --mid:#0c1626;--mid-2:#13213a;--mid-3:#1b2d4b;
+  --ivory:#f8f5ef;--ivory-2:#efe9de;--paper:#ffffff;
+  --gold:#c6a46a;--gold-deep:#9f7f47;--gold-soft:#e3cfa6;
+  --ink:#141b26;--muted:#5e6672;--muted-2:#8a919b;--line:#e2dbcd;--line-2:#ebe6dc;
+  --ok:#2e7d4f;--ok-bg:#e6f3ea;--warn:#a86b0a;--warn-bg:#fcf1dc;--bad:#b3261e;--bad-bg:#fbe9e7;--info:#1f5fa8;--info-bg:#e7eff9;
+  --display:"Cormorant Garamond",Georgia,serif;--body:"Manrope",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --r:6px;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ivory);color:var(--ink);font-family:var(--body);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,p{margin:0}
+h1,h2{font-family:var(--display);font-weight:500;letter-spacing:0;line-height:1.1}
+h1{font-size:1.9rem}h2{font-size:1.45rem}h3{font-size:1.05rem;font-weight:700}
+a{color:var(--info)}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{width:100%;min-height:40px;padding:.5rem .7rem;border:1px solid var(--line);border-radius:var(--r);background:#fff}
+textarea{min-height:90px;resize:vertical;line-height:1.5}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+label{display:grid;gap:.3rem;font-size:.74rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+label > input,label > select,label > textarea{font-size:.95rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;min-height:40px;padding:.55rem 1rem;border-radius:var(--r);border:1px solid var(--mid);background:var(--mid);color:#fff;font-weight:600;cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn:hover{background:var(--mid-3)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:var(--mid)}
+.btn.gold:hover{background:var(--gold-soft)}
+.btn.ghost{background:transparent;color:var(--mid);border-color:var(--line)}
+.btn.ghost:hover{background:#fff}
+.btn.danger{background:var(--bad);border-color:var(--bad)}
+.btn.sm{min-height:32px;padding:.3rem .7rem;font-size:.82rem}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.pill{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .6rem;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.info{background:var(--info-bg);color:var(--info)}.pill.mute{background:var(--ivory-2);color:var(--muted)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r)}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--line-2)}
+.card-b{padding:1.1rem}
+.grid{display:grid;gap:1rem}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g6{grid-template-columns:repeat(6,1fr)}
+@media (max-width:1100px){.g6{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:600px){.g6{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.muted{color:var(--muted)}.small{font-size:.82rem}.mono{font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:.6rem .7rem;border-bottom:1px solid var(--line-2);vertical-align:top}
+th{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;background:var(--ivory)}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--ivory)}
+.table-wrap{overflow-x:auto}
+.empty{padding:2rem;text-align:center;color:var(--muted)}
+.notice{padding:.7rem .9rem;border-radius:var(--r);font-size:.88rem}
+.notice.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #efd9a6}
+.notice.bad{background:var(--bad-bg);color:var(--bad);border:1px solid #f1c2bd}
+.notice.info{background:var(--info-bg);color:var(--info);border:1px solid #c6d8ef}
+.notice.ok{background:var(--ok-bg);color:var(--ok);border:1px solid #bfe0c9}
+hr.sep{border:0;border-top:1px solid var(--line);margin:1rem 0}
+
+/* Demo banner */
+.demo-bar{background:var(--bad);color:#fff;text-align:center;font-weight:700;font-size:.82rem;letter-spacing:.06em;padding:.45rem 1rem}
+.demo-bar b{text-transform:uppercase}
+
+/* Login */
+.login{min-height:100%;display:grid;place-items:center;background:var(--mid);padding:1.5rem}
+.login .box{width:min(420px,100%);background:var(--paper);border-radius:10px;padding:2rem;display:grid;gap:1rem}
+.login .brand{display:flex;align-items:center;gap:.7rem;font-family:var(--display);font-size:1.5rem;font-weight:600;color:var(--mid)}
+.login .mark{width:36px;height:36px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;font-family:var(--body);font-size:.6rem;font-weight:800;letter-spacing:.12em;color:var(--gold-deep)}
+.login .foot{text-align:center;color:#8fa0b5;font-size:.78rem;margin-top:1rem}
+
+/* Shell */
+.shell{display:grid;grid-template-columns:240px 1fr;min-height:100%}
+@media (max-width:900px){.shell{grid-template-columns:1fr}}
+.side{background:var(--mid);color:#dfe5ee;padding:1.1rem .9rem;display:flex;flex-direction:column;gap:.4rem;position:sticky;top:0;height:100vh;overflow:auto}
+@media (max-width:900px){.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:.7rem}}
+.side .brand{display:flex;align-items:center;gap:.6rem;color:#fff;font-family:var(--display);font-size:1.25rem;font-weight:600;padding:.4rem .5rem 1rem;text-decoration:none}
+.side .mark{width:30px;height:30px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;font-family:var(--body);font-size:.55rem;font-weight:800;letter-spacing:.1em;color:var(--gold)}
+.side a.nav{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem;border-radius:var(--r);color:#cfd6e0;text-decoration:none;font-weight:600;font-size:.9rem;min-height:40px}
+.side a.nav:hover{background:rgba(255,255,255,.06);color:#fff}
+.side a.nav.on{background:rgba(198,164,106,.18);color:var(--gold-soft)}
+.side a.nav svg{width:18px;height:18px;flex:none}
+.side .spacer{flex:1}
+.side .user{padding:.7rem;border-top:1px solid rgba(255,255,255,.1);font-size:.82rem;color:#aeb8c6}
+.side .user b{display:block;color:#fff}
+@media (max-width:900px){.side .brand{padding:.2rem .4rem;font-size:1.1rem}.side a.nav{padding:.45rem .6rem;font-size:.82rem}.side .spacer,.side .user{display:none}}
+.main{padding:1.4rem clamp(1rem,2.5vw,2rem) 4rem;min-width:0}
+.page-h{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem}
+.page-h .sub{color:var(--muted);font-size:.9rem;margin-top:.2rem}
+.kpi{display:grid;gap:.2rem;padding:1rem 1.1rem}
+.kpi b{font-family:var(--display);font-size:2.2rem;font-weight:500;line-height:1;color:var(--mid)}
+.kpi span{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.tabs{display:flex;gap:.2rem;border-bottom:1px solid var(--line);margin-bottom:1rem;overflow-x:auto}
+.tabs a{padding:.6rem .9rem;text-decoration:none;color:var(--muted);font-weight:600;font-size:.88rem;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs a.on{color:var(--mid);border-color:var(--gold)}
+.note{white-space:pre-wrap;font-size:.92rem;line-height:1.55}
+.search{max-width:420px}
+.chip{display:inline-flex;align-items:center;gap:.3rem;background:var(--ivory-2);border-radius:999px;padding:.2rem .6rem;font-size:.8rem}
+.toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:var(--mid);color:#fff;padding:.7rem 1.1rem;border-radius:var(--r);font-size:.9rem;z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none;max-width:90vw}
+.toast.show{display:block}
+.modal-bg{position:fixed;inset:0;background:rgba(12,22,38,.55);display:none;place-items:center;z-index:40;padding:1rem}
+.modal-bg.show{display:grid}
+.modal{background:#fff;border-radius:10px;width:min(720px,100%);max-height:92vh;overflow:auto;padding:1.4rem;display:grid;gap:1rem}
+.modal.wide{width:min(980px,100%)}
+.form{display:grid;gap:.9rem}
+.form .g2{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.form .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem}
+@media (max-width:640px){.form .g2,.form .g3{grid-template-columns:1fr}}
+.rxline{display:grid;grid-template-columns:2fr 1fr 2fr 1fr 1fr auto;gap:.5rem;align-items:end}
+@media (max-width:900px){.rxline{grid-template-columns:1fr 1fr}}
+.score{font-family:var(--display);font-size:1.6rem;color:var(--mid)}
+.sig{border-top:1px dashed var(--line);padding-top:.6rem;margin-top:.6rem;font-size:.82rem;color:var(--muted)}
+.lock{color:var(--ok);font-weight:700}
+.audit td{font-size:.82rem}
+.hidden{display:none!important}
+.fieldset{border:1px solid var(--line);border-radius:var(--r);padding:1rem;display:grid;gap:.8rem}
+.fieldset > legend,.fieldset > .lg{font-family:var(--display);font-size:1.2rem;color:var(--mid);padding:0 .3rem}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.4rem}
+.checks label{display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-weight:500;font-size:.9rem;color:var(--ink)}
+.checks input{width:auto;min-height:0}
+.rangerow{display:grid;grid-template-columns:1fr auto;gap:.6rem;align-items:center}
+.printable{font-family:Georgia,serif}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast" role="status"></div>
+<div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
+
+<script>
+(function(){
+'use strict';
+const CFG=window.PMP_CONFIG||{};
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():'id-'+Math.random().toString(36).slice(2)+Date.now().toString(36));
+const now=()=>new Date().toISOString();
+const fmtD=d=>d?new Date(d).toLocaleDateString('en-CA',{year:'numeric',month:'short',day:'numeric'}):'';
+const fmtDT=d=>d?new Date(d).toLocaleString('en-CA',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const age=dob=>{if(!dob)return'';const b=new Date(dob),t=new Date();let a=t.getFullYear()-b.getFullYear();const m=t.getMonth()-b.getMonth();if(m<0||(m===0&&t.getDate()<b.getDate()))a--;return a;};
+const toast=(m,ms=2600)=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),ms);};
+const DEMO=!CFG.supabaseUrl;
+
+/* ================= DATA LAYER ================= */
+const TABLES=['profiles','patients','encounters','assessments','documents','prescriptions','fax_jobs','inbound_faxes','appointments','web_requests','message_threads','messages','invoices','fee_schedule','audit_log'];
+let session=null; // {user:{id,email}, profile}
+
+// ---- Demo adapter (browser-only) ----
+const demo={
+  key:'pmp_demo_db_v1',
+  db:null,
+  load(){try{this.db=JSON.parse(localStorage.getItem(this.key)||'null')}catch(e){this.db=null}
+    if(!this.db){this.db=seed();this.save();}
+  },
+  save(){try{localStorage.setItem(this.key,JSON.stringify(this.db))}catch(e){}},
+  async list(t,f={}){let rows=this.db[t]||[];Object.entries(f).forEach(([k,v])=>{rows=rows.filter(r=>r[k]===v)});return rows.slice().sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));},
+  async get(t,id){return (this.db[t]||[]).find(r=>r.id===id)||null;},
+  async insert(t,row){row={id:uid(),created_at:now(),updated_at:now(),owner_id:session.user.id,...row};(this.db[t]=this.db[t]||[]).push(row);this.save();audit('insert',t,row.id);return row;},
+  async update(t,id,patch){const r=await this.get(t,id);if(!r)throw new Error('Not found');Object.assign(r,patch,{updated_at:now()});this.save();audit('update',t,id);return r;},
+  async upload(path,file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>{this.db._files=this.db._files||{};this.db._files[path]=fr.result;this.save();res(path)};fr.onerror=rej;fr.readAsDataURL(file);});},
+  async fileUrl(path){return (this.db._files||{})[path]||'';},
+  async fn(name,body){ // simulated server functions
+    if(name==='send-fax'){const job=await this.insert('fax_jobs',{prescription_id:body.ref_type==='prescription'?body.ref_id:null,ref_type:body.ref_type||'adhoc',ref_id:body.ref_id||null,to_fax:body.to_fax,to_name:body.to_name||'',subject:body.subject||'',direction:'out',status:'queued_local',provider:'self',source:'portal',detail:'Queued for the clinic fax server (demo: no server connected)'});return {ok:true,job};}
+    if(name==='create-video-room'){const room='PMP-'+Math.random().toString(36).slice(2,10);return {ok:true,provider:'jitsi',url:'https://meet.jit.si/'+room+'#config.prejoinPageEnabled=true',interim:true};}
+    if(name==='fax-status'){return {ok:true,status:'queued_no_provider'};}
+    if(name==='fax-inbox'){if(body&&body.retrieve){const inb=(this.db.inbound_faxes||[]).find(f=>f.provider_ref===body.retrieve);const doc=await this.insert('documents',{patient_id:body.patient_id,category:body.category||'Correspondence',description:body.description||('Inbound fax from '+(inb?.from_number||'')),filename:'fax-'+body.retrieve+'.pdf',size:0,mime:'application/pdf',path:'demo-inbound-'+body.retrieve});if(inb)await this.update('inbound_faxes',inb.id,{status:'filed',document_id:doc.id,patient_id:body.patient_id});return {ok:true,document:doc};}
+      if(!(this.db.inbound_faxes||[]).length){await this.insert('inbound_faxes',{provider:'srfax',provider_ref:'20261019-0001',from_number:'519-555-0199',from_name:'EXAMPLE PHARMACY',received_at:now(),pages:1,status:'new',suggested_patient_id:'p-001',notified_at:now()});}return {ok:true,configured:false,items:await this.list('inbound_faxes')};}
+    if(name==='secure-message-send'){let tid=body.thread_id;if(!tid){const t=await this.insert('message_threads',{patient_id:body.patient_id,subject:body.subject||'Message from PMP Healthcare',recipient_name:body.recipient_name||'',recipient_email:body.recipient_email,status:'open',last_message_at:now()});tid=t.id;}const m=await this.insert('messages',{thread_id:tid,sender:'clinician',sender_name:'PMP Healthcare',body:body.body,attachment_document_id:body.attachment_document_id||null});await this.update('message_threads',tid,{last_message_at:now(),status:'open'});return {ok:true,thread_id:tid,message:m,emailed:false,link:(CFG.portalUrl||'')+'/secure.html#demo-'+tid.slice(0,8)};}
+    if(name==='create-payment'){const inv=await this.get('invoices',body.invoice_id);await this.update('invoices',inv.id,{status:'sent',issued_at:inv.issued_at||now(),pay_url:''});return {ok:true,pay_url:null,note:'Demo mode: Stripe not configured. Invoice marked sent.'};}
+    return {ok:false,error:'Unknown function'};
+  }
+};
+
+// ---- Supabase adapter ----
+let sb=null;
+const real={
+  async list(t,f={}){let q=sb.from(t).select('*');Object.entries(f).forEach(([k,v])=>{q=q.eq(k,v)});const {data,error}=await q.order('created_at',{ascending:false});if(error)throw error;return data;},
+  async get(t,id){const {data,error}=await sb.from(t).select('*').eq('id',id).maybeSingle();if(error)throw error;return data;},
+  async insert(t,row){const {data,error}=await sb.from(t).insert({...row,owner_id:session.user.id}).select().single();if(error)throw error;return data;},
+  async update(t,id,patch){const {data,error}=await sb.from(t).update(patch).eq('id',id).select().single();if(error)throw error;return data;},
+  async upload(path,file){const {error}=await sb.storage.from('documents').upload(path,file,{upsert:false});if(error)throw error;return path;},
+  async fileUrl(path){const {data,error}=await sb.storage.from('documents').createSignedUrl(path,600);if(error)throw error;return data.signedUrl;},
+  async fn(name,body){const {data,error}=await sb.functions.invoke(name,{body});if(error)throw error;return data;}
+};
+const DB=DEMO?demo:real;
+async function audit(action,table,row_id,meta){try{const row={action,table_name:table,row_id,meta:meta||null,actor:session?.user?.email||'system',created_at:now(),id:uid()};if(DEMO){(demo.db.audit_log=demo.db.audit_log||[]).push(row);demo.save();}else{await sb.from('audit_log').insert({action,table_name:table,row_id,meta:meta||null});}}catch(e){console.warn('audit',e)}}
+
+function seed(){
+  const o='demo-user';const t=now();
+  const p1={id:'p-001',owner_id:o,created_at:t,updated_at:t,first_name:'Margaret',last_name:'Sample',dob:'1941-03-14',sex:'F',hcn:'',phone:'519-555-0101',email:'',address:'Sarnia, ON',setting:'Retirement residence',facility:'Example Retirement Residence',pcp:'Dr. Example (family physician)',pharmacy_name:'Example Pharmacy',pharmacy_fax:'519-555-0199',allergies:'Penicillin (rash)',problems:'Hypertension; Type 2 diabetes; Osteoarthritis; Mild cognitive impairment',medications:'Amlodipine 5 mg daily\nMetformin 500 mg BID\nAcetaminophen 650 mg TID PRN\nLorazepam 0.5 mg HS',sdm:'Daughter: Jane Sample 519-555-0102',notes:'SAMPLE RECORD for demonstration only.'};
+  const p2={id:'p-002',owner_id:o,created_at:t,updated_at:t,first_name:'Robert',last_name:'Example',dob:'1958-11-02',sex:'M',hcn:'',phone:'519-555-0110',email:'',address:'Petrolia, ON',setting:'Community (virtual)',facility:'',pcp:'None (unattached)',pharmacy_name:'Example Drug Mart',pharmacy_fax:'519-555-0198',allergies:'NKDA',problems:'COPD; Dyslipidemia',medications:'Tiotropium 18 mcg inh daily\nAtorvastatin 20 mg HS',sdm:'',notes:'SAMPLE RECORD for demonstration only.'};
+  const today=new Date();const at=(h,m)=>{const d=new Date(today);d.setHours(h,m,0,0);return d.toISOString();};
+  return {
+    profiles:[{id:o,owner_id:o,display_name:'Nurse Practitioner (demo)',credentials:'NP-PHC, RN(EC)',cno_number:'0000000',signature_line:'Nurse Practitioner, PMP Healthcare Corp.',created_at:t}],
+    patients:[p1,p2],
+    encounters:[{id:'e-001',owner_id:o,patient_id:'p-001',created_at:t,updated_at:t,type:'Medication review',title:'Quarterly medication review',body:'ASSESSMENT / IMPRESSION\nPolypharmacy with one Beers-listed agent (lorazepam). BP controlled. A1c 7.1%.\n\nNOTE\nResident seen at bedside with daughter present. Reports daytime drowsiness and one near-fall this month. No orthostatic symptoms. Sleep onset difficulty predates lorazepam.\n\nORDERS\n1. Lorazepam 0.5 mg HS: reduce to 0.25 mg HS x 2 weeks, then stop.\n2. Sleep hygiene plan to nursing; melatonin 3 mg HS may start after lorazepam stopped.\n3. Orthostatic BP x 3 days.\n\nMONITORING\nFalls, sleep log, daytime alertness; review in 2 weeks.\n\nRATIONALE\nBenzodiazepine in an 85-year-old with near-fall and MCI; Beers 2023 strong recommendation to avoid. Gradual taper to limit rebound insomnia.',signed_at:t,signed_by:'Nurse Practitioner (demo)',locked:true}],
+    assessments:[],documents:[],prescriptions:[],fax_jobs:[],
+    appointments:[{id:'a-001',owner_id:o,patient_id:'p-002',created_at:t,start_at:at(10,30),duration_min:30,type:'Virtual visit',mode:'virtual',status:'booked',reason:'COPD follow-up and inhaler technique',video_url:''},{id:'a-002',owner_id:o,patient_id:'p-001',created_at:t,start_at:at(14,0),duration_min:60,type:'Facility visit',mode:'facility',status:'booked',reason:'Geriatric assessment, falls'}],
+    fee_schedule:[{id:'fee-1',owner_id:o,created_at:t,code:'VV30',label:'Virtual visit, 30 min',amount_cents:9500,taxable:false,active:true},{id:'fee-2',owner_id:o,created_at:t,code:'VV45',label:'New patient or complex visit, 45 min',amount_cents:14000,taxable:false,active:true},{id:'fee-3',owner_id:o,created_at:t,code:'CGA',label:'Geriatric assessment with report',amount_cents:32500,taxable:false,active:true},{id:'fee-4',owner_id:o,created_at:t,code:'MEDREV',label:'Medication review and deprescribing',amount_cents:14000,taxable:false,active:true},{id:'fee-5',owner_id:o,created_at:t,code:'NOTE',label:'Sick note or short form',amount_cents:3000,taxable:true,active:true},{id:'fee-6',owner_id:o,created_at:t,code:'FAC-HALF',label:'Facility half-day block',amount_cents:60000,taxable:false,active:true}],
+    invoices:[{id:'inv-001',owner_id:o,created_at:t,updated_at:t,patient_id:'p-002',number:'PMP-1001',description:'Virtual visit, 30 min',service_date:new Date().toISOString().slice(0,10),amount_cents:9500,tax_cents:0,currency:'CAD',status:'sent',issued_at:t,payer_email:'',pay_url:''}],
+    message_threads:[],messages:[],inbound_faxes:[],
+    web_requests:[{id:'w-001',owner_id:o,created_at:t,name:'Sample Enquirer',email:'sample@example.com',phone:'519-555-0150',role:'A family member or caregiver',request_type:'Geriatric assessment',message:'Mother in retirement home, memory worse over 3 months, two falls. Prefer Tuesday mornings.',status:'new'}],
+    audit_log:[]
+  };
+}
+
+/* ================= AUTH ================= */
+let needsPassword=false;
+async function initAuth(){
+  if(DEMO){demo.load();const s=sessionStorage.getItem('pmp_demo_session');if(s){session=JSON.parse(s);}return;}
+  sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
+  const h=location.hash||'';
+  if(/type=(invite|recovery|magiclink|signup)/.test(h)||/access_token=/.test(h)){needsPassword=/type=(invite|recovery)/.test(h);}
+  const {data}=await sb.auth.getSession();
+  if(data.session){if(needsPassword){session=null;return;}await hydrate(data.session.user);}
+  sb.auth.onAuthStateChange(async(ev,s)=>{if(ev==='SIGNED_OUT'){session=null;render();}if(ev==='PASSWORD_RECOVERY'){needsPassword=true;render();}});
+}
+function setPasswordView(){return `<div class="login"><form class="box" id="pw-form">
+  <div class="brand"><span class="mark">NP</span>PMP Clinician Portal</div>
+  <h2 style="font-size:1.4rem">Set your password</h2>
+  <p class="muted small">Choose a strong password (12+ characters). You will set up two-factor authentication right after signing in.</p>
+  <label>New password<input type="password" id="pw1" autocomplete="new-password" minlength="12" required></label>
+  <label>Confirm password<input type="password" id="pw2" autocomplete="new-password" minlength="12" required></label>
+  <div id="pw-err" class="notice bad hidden"></div>
+  <button class="btn gold" type="submit" id="pw-btn">Save password and continue</button>
+</form></div>`;}
+function bindSetPassword(){$('#pw-form').addEventListener('submit',async e=>{e.preventDefault();const a=$('#pw1').value,b=$('#pw2').value,err=$('#pw-err');err.classList.add('hidden');if(a.length<12)return(err.textContent='Use at least 12 characters.',err.classList.remove('hidden'));if(a!==b)return(err.textContent='Passwords do not match.',err.classList.remove('hidden'));$('#pw-btn').disabled=true;try{const {error}=await sb.auth.updateUser({password:a});if(error)throw error;needsPassword=false;history.replaceState(null,'',location.pathname+'#/settings');const {data}=await sb.auth.getUser();await hydrate(data.user);await audit('password_set','auth',data.user.id);toast('Password saved. Now set up two-factor authentication.');render();}catch(ex){err.textContent=ex.message||String(ex);err.classList.remove('hidden');}finally{const b2=$('#pw-btn');if(b2)b2.disabled=false;}});}
+async function hydrate(user){
+  let profile=null;
+  try{const {data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();profile=data;}catch(e){}
+  if(!profile){const {data}=await sb.from('profiles').insert({id:user.id,owner_id:user.id,display_name:user.email,credentials:'NP',cno_number:'',signature_line:'Nurse Practitioner, PMP Healthcare Corp.'}).select().single();profile=data;}
+  session={user:{id:user.id,email:user.email},profile};
+}
+async function login(email,pw){
+  if(DEMO){
+    if(pw!=='demo-pmp')throw new Error('Demo password is demo-pmp');
+    session={user:{id:'demo-user',email:email||'demo@pmphealthcare.ca'},profile:demo.db.profiles[0]};
+    sessionStorage.setItem('pmp_demo_session',JSON.stringify(session));audit('login','auth',session.user.id);return {mfa:false};
+  }
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pw});if(error)throw error;
+  const {data:aal}=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(aal.nextLevel==='aal2'&&aal.currentLevel!=='aal2'){return {mfa:true};}
+  await hydrate(data.user);await audit('login','auth',data.user.id);return {mfa:false};
+}
+async function verifyMfa(code){
+  const {data:f}=await sb.auth.mfa.listFactors();const factor=f.totp[0];
+  const {data:ch,error:e1}=await sb.auth.mfa.challenge({factorId:factor.id});if(e1)throw e1;
+  const {error:e2}=await sb.auth.mfa.verify({factorId:factor.id,challengeId:ch.id,code});if(e2)throw e2;
+  const {data}=await sb.auth.getUser();await hydrate(data.user);await audit('login_mfa','auth',data.user.id);
+}
+async function logout(){await audit('logout','auth',session?.user?.id);if(DEMO){sessionStorage.removeItem('pmp_demo_session');session=null;render();return;}await sb.auth.signOut();session=null;render();}
+
+/* ================= ASSESSMENT TEMPLATES ================= */
+const T={
+  cga:{name:'Comprehensive Geriatric Assessment',sections:[
+    {t:'Presenting concern',f:[{k:'reason',l:'Reason for assessment',ty:'textarea'},{k:'source',l:'Collateral source',ty:'text'}]},
+    {t:'Function',f:[{k:'adl',l:'Katz ADL (0–6)',ty:'num',max:6},{k:'iadl',l:'Lawton IADL (0–8)',ty:'num',max:8},{k:'mobility',l:'Mobility / aids',ty:'text'},{k:'tug',l:'Timed Up and Go (seconds)',ty:'num'}]},
+    {t:'Cognition and mood',f:[{k:'moca',l:'MoCA (/30)',ty:'num',max:30},{k:'mmse',l:'MMSE (/30, if used)',ty:'num',max:30},{k:'gds',l:'GDS-15 (/15)',ty:'num',max:15},{k:'delirium',l:'CAM delirium screen',ty:'sel',o:['Negative','Positive','Not done']},{k:'cogn',l:'Cognitive history and observations',ty:'textarea'}]},
+    {t:'Frailty and falls',f:[{k:'cfs',l:'Clinical Frailty Scale (1–9)',ty:'num',max:9},{k:'falls12',l:'Falls in last 12 months',ty:'num'},{k:'fear',l:'Fear of falling',ty:'sel',o:['No','Yes']},{k:'orth',l:'Orthostatic BP (lying / standing)',ty:'text'}]},
+    {t:'Medical and medications',f:[{k:'problems',l:'Active problems',ty:'textarea'},{k:'medcount',l:'Number of regular medications',ty:'num'},{k:'beers',l:'Beers / STOPP flags identified',ty:'textarea'},{k:'nutrition',l:'Nutrition (weight trend, MNA-SF if done)',ty:'text'},{k:'continence',l:'Continence',ty:'text'},{k:'sensory',l:'Vision / hearing',ty:'text'},{k:'pain',l:'Pain (0–10)',ty:'num',max:10}]},
+    {t:'Social and goals',f:[{k:'living',l:'Living situation and supports',ty:'textarea'},{k:'sdm',l:'SDM / POA status',ty:'text'},{k:'goals',l:'Goals of care discussed',ty:'textarea'}]},
+    {t:'Impression and plan',f:[{k:'impression',l:'Assessment / impression',ty:'textarea'},{k:'plan',l:'Recommendations (numbered)',ty:'textarea'},{k:'fu',l:'Follow-up',ty:'text'}]}
+  ]},
+  medrev:{name:'Medication Review and Deprescribing',sections:[
+    {t:'Context',f:[{k:'indication',l:'Trigger for review',ty:'sel',o:['Quarterly','Admission','Fall','Transition of care','Family request','Other']},{k:'renal',l:'eGFR / CrCl',ty:'text'},{k:'weight',l:'Weight (kg)',ty:'num'}]},
+    {t:'Medication list (one per line: drug, dose, frequency, indication)',f:[{k:'meds',l:'Current medications',ty:'textarea'}]},
+    {t:'Screening',f:[{k:'beers',l:'Beers 2023 criteria met',ty:'textarea'},{k:'stopp',l:'STOPP criteria met',ty:'textarea'},{k:'start',l:'START omissions',ty:'textarea'},{k:'acb',l:'Anticholinergic burden score',ty:'num'},{k:'interactions',l:'Clinically relevant interactions',ty:'textarea'}]},
+    {t:'Plan',f:[{k:'stop',l:'Stop',ty:'textarea'},{k:'taper',l:'Taper (agent, schedule)',ty:'textarea'},{k:'startnew',l:'Start / adjust',ty:'textarea'},{k:'monitor',l:'Monitoring',ty:'textarea'},{k:'rationale',l:'Brief rationale',ty:'textarea'}]}
+  ]},
+  falls:{name:'Falls Assessment',sections:[
+    {t:'Event',f:[{k:'when',l:'Date / time of fall',ty:'text'},{k:'circ',l:'Circumstances (witnessed, activity, location)',ty:'textarea'},{k:'injury',l:'Injury / head strike / anticoagulated',ty:'textarea'}]},
+    {t:'Risk factors',f:[{k:'rf',l:'Risk factors present',ty:'checks',o:['Previous falls','Gait or balance impairment','Polypharmacy (≥5)','Psychotropic medication','Orthostatic hypotension','Cognitive impairment','Visual impairment','Urinary urgency / nocturia','Footwear / environment','Vitamin D not supplemented']},{k:'tug',l:'Timed Up and Go (s)',ty:'num'},{k:'orth',l:'Orthostatic vitals',ty:'text'},{k:'mfs',l:'Morse Fall Scale (if used)',ty:'num',max:125}]},
+    {t:'Plan',f:[{k:'impression',l:'Assessment / impression',ty:'textarea'},{k:'plan',l:'Orders and interventions',ty:'textarea'},{k:'monitor',l:'Monitoring',ty:'textarea'}]}
+  ]},
+  capacity:{name:'Capacity and Goals of Care',sections:[
+    {t:'Decision',f:[{k:'decision',l:'Specific decision being assessed',ty:'textarea'},{k:'who',l:'Present',ty:'text'}]},
+    {t:'Capacity (HCCA criteria)',f:[{k:'understand',l:'Able to understand information relevant to the decision',ty:'sel',o:['Yes','No','Partially']},{k:'appreciate',l:'Able to appreciate reasonably foreseeable consequences',ty:'sel',o:['Yes','No','Partially']},{k:'evidence',l:'Evidence (patient\'s own words)',ty:'textarea'},{k:'finding',l:'Finding',ty:'sel',o:['Capable for this decision','Incapable for this decision; SDM to be engaged']}]},
+    {t:'Goals of care',f:[{k:'values',l:'Values and priorities expressed',ty:'textarea'},{k:'cpr',l:'CPR / level of intervention',ty:'sel',o:['Full code','No CPR; transfer to hospital acceptable','No CPR; comfort-focused in place','Not discussed']},{k:'plan',l:'Plan and communication (SDM, team, PCP)',ty:'textarea'}]}
+  ]},
+  admission:{name:'Admission / Annual Assessment',sections:[
+    {t:'History',f:[{k:'hpi',l:'Reason for admission / interval history',ty:'textarea'},{k:'pmh',l:'Past medical history',ty:'textarea'},{k:'meds',l:'Medication reconciliation',ty:'textarea'},{k:'allergies',l:'Allergies',ty:'text'},{k:'social',l:'Social / functional baseline',ty:'textarea'}]},
+    {t:'Examination',f:[{k:'vitals',l:'Vitals (BP, HR, RR, T, SpO2, weight)',ty:'text'},{k:'exam',l:'Physical examination',ty:'textarea'},{k:'cog',l:'Cognition / mood screen',ty:'text'}]},
+    {t:'Assessment and plan',f:[{k:'impression',l:'Assessment / impression (problem list)',ty:'textarea'},{k:'orders',l:'Orders',ty:'textarea'},{k:'monitor',l:'Monitoring',ty:'textarea'},{k:'rationale',l:'Brief rationale',ty:'textarea'},{k:'goc',l:'Goals of care / code status',ty:'text'}]}
+  ]}
+};
+function narrative(tpl,v){let out=tpl.name.toUpperCase()+'\n';tpl.sections.forEach(s=>{const lines=s.f.map(f=>{let val=v[f.k];if(Array.isArray(val))val=val.join(', ');if(val===undefined||val===''||val===null)return null;return `${f.l}: ${val}`}).filter(Boolean);if(lines.length)out+=`\n${s.t.toUpperCase()}\n${lines.join('\n')}\n`});return out.trim();}
+
+/* ================= UI HELPERS ================= */
+function modal(html,wide){const bg=$('#modal-bg');const old=$('#modal');const m=old.cloneNode(false);old.replaceWith(m);m.className='modal'+(wide?' wide':'');m.innerHTML=html;bg.classList.add('show');return m;}
+function closeModal(){$('#modal-bg').classList.remove('show');$('#modal').innerHTML='';}
+$('#modal-bg').addEventListener('click',e=>{if(e.target.id==='modal-bg')closeModal();});
+function field(f,val){const v=val??'';const base=`data-k="${f.k}"`;
+  if(f.ty==='textarea')return `<label>${esc(f.l)}<textarea ${base}>${esc(v)}</textarea></label>`;
+  if(f.ty==='num')return `<label>${esc(f.l)}<input type="number" step="any" ${f.max?`max="${f.max}"`:''} ${base} value="${esc(v)}"></label>`;
+  if(f.ty==='sel')return `<label>${esc(f.l)}<select ${base}><option value="">—</option>${f.o.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
+  if(f.ty==='checks')return `<div><div class="small muted" style="font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.74rem;margin-bottom:.4rem">${esc(f.l)}</div><div class="checks" ${base}>${f.o.map(o=>`<label><input type="checkbox" value="${esc(o)}" ${(Array.isArray(v)&&v.includes(o))?'checked':''}>${esc(o)}</label>`).join('')}</div></div>`;
+  return `<label>${esc(f.l)}<input type="text" ${base} value="${esc(v)}"></label>`;}
+function readFields(root){const out={};if(!root)return out;$$('[data-k]',root).forEach(el=>{const k=el.dataset.k;if(el.classList.contains('checks')){out[k]=$$('input:checked',el).map(i=>i.value);}else if(el.type==='checkbox'){out[k]=el.checked;}else{out[k]=el.value;}});return out;}
+const ICON={dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/></svg>',cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>',ppl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 11a3 3 0 100-6M21.5 20a6 6 0 00-5-5.9"/></svg>',rx:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h5a4 4 0 010 8H6zM6 11v10M11 11l8 10M19 11l-8 10"/></svg>',inbox:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13l2.5-8h13L21 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M3 13h5l2 3h4l2-3h5"/></svg>',log:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',msg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/></svg>',pay:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/></svg>',cog:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>'};
+
+/* ================= ROUTER ================= */
+function route(){const h=location.hash.replace(/^#\/?/,'')||'dashboard';const parts=h.split('/');return {page:parts[0],id:parts[1],tab:parts[2]};}
+window.addEventListener('hashchange',render);
+
+async function render(){
+  const app=$('#app');
+  if(!session&&needsPassword){app.innerHTML=setPasswordView();bindSetPassword();return;}
+  if(!session){app.innerHTML=loginView();bindLogin();return;}
+  const r=route();
+  const nav=[['dashboard','Dashboard','dash'],['schedule','Schedule','cal'],['patients','Patients','ppl'],['messages','Secure messages','msg'],['rx','Prescriptions & fax','rx'],['payments','Payments','pay'],['requests','Web requests','inbox'],['audit','Audit log','log'],['settings','Settings','cog']];
+  app.innerHTML=`${DEMO?'<div class="demo-bar"><b>Demo mode</b> · browser-only sample data · do not enter real patient information</div>':''}
+  <div class="shell">
+    <aside class="side">
+      <a class="brand" href="#/dashboard"><span class="mark">NP</span>PMP Portal</a>
+      ${nav.map(n=>`<a class="nav ${r.page===n[0]||(r.page==='patient'&&n[0]==='patients')?'on':''}" href="#/${n[0]}">${ICON[n[2]]}${n[1]}</a>`).join('')}
+      <div class="spacer"></div>
+      <div class="user"><b>${esc(session.profile?.display_name||session.user.email)}</b>${esc(session.user.email)}<br><button class="btn ghost sm" id="logout" style="margin-top:.5rem;color:#fff;border-color:rgba(255,255,255,.3)">Sign out</button></div>
+    </aside>
+    <main class="main" id="main"></main>
+  </div>`;
+  $('#logout')?.addEventListener('click',logout);
+  const main=$('#main');
+  try{
+    if(r.page==='dashboard')await pageDashboard(main);
+    else if(r.page==='schedule')await pageSchedule(main);
+    else if(r.page==='patients')await pagePatients(main);
+    else if(r.page==='patient')await pagePatient(main,r.id,r.tab||'summary');
+    else if(r.page==='rx')await pageRx(main);
+    else if(r.page==='messages')await pageMessages(main,r.id);
+    else if(r.page==='payments')await pagePayments(main);
+    else if(r.page==='requests')await pageRequests(main);
+    else if(r.page==='audit')await pageAudit(main);
+    else if(r.page==='settings')await pageSettings(main);
+    else main.innerHTML='<div class="empty">Page not found.</div>';
+  }catch(e){console.error(e);main.innerHTML=`<div class="notice bad">Error: ${esc(e.message||e)}</div>`;}
+}
+
+/* ================= LOGIN ================= */
+function loginView(){return `<div class="login"><form class="box" id="login-form">
+  <div class="brand"><span class="mark">NP</span>PMP Clinician Portal</div>
+  <p class="muted small">Authorised clinicians only. All access is logged.</p>
+  ${DEMO?'<div class="notice warn"><b>Demo mode.</b> No backend configured. Sign in with any email and the password <code>demo-pmp</code>. Data stays in this browser. Do not enter real patient information.</div>':''}
+  <label>Email<input type="email" id="l-email" autocomplete="username" required></label>
+  <label>Password<input type="password" id="l-pw" autocomplete="current-password" required></label>
+  ${DEMO?'':'<div class="small"><a href="#" id="l-forgot">Forgot password?</a></div>'}
+  <div id="mfa-box" class="hidden"><label>Authenticator code<input type="text" id="l-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label></div>
+  <div id="l-err" class="notice bad hidden"></div>
+  <button class="btn gold" type="submit" id="l-btn">Sign in</button>
+  <div class="foot">${esc(CFG.clinic?.name||'PMP Healthcare Corp.')} · Sarnia, Ontario · Private and confidential</div>
+</form></div>`;}
+function bindLogin(){const f=$('#login-form');let mfa=false;$('#l-forgot')?.addEventListener('click',async e=>{e.preventDefault();const em=$('#l-email').value.trim();if(!em)return toast('Enter your email first');const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:(CFG.portalUrl||location.origin)+'/'});toast(error?error.message:'If that account exists, a reset link has been emailed.');});f.addEventListener('submit',async e=>{e.preventDefault();const err=$('#l-err');err.classList.add('hidden');$('#l-btn').disabled=true;try{if(mfa){await verifyMfa($('#l-code').value.trim());render();return;}const r=await login($('#l-email').value.trim(),$('#l-pw').value);if(r.mfa){mfa=true;$('#mfa-box').classList.remove('hidden');$('#l-btn').textContent='Verify code';$('#l-code').focus();}else render();}catch(ex){err.textContent=ex.message||String(ex);err.classList.remove('hidden');}finally{const b=$('#l-btn');if(b)b.disabled=false;}});}
+
+/* ================= DASHBOARD ================= */
+async function pageDashboard(m){
+  const [appts,pts,encs,reqs,fax,rxs,msgs,invs]=await Promise.all([DB.list('appointments'),DB.list('patients'),DB.list('encounters'),DB.list('web_requests'),DB.list('fax_jobs'),DB.list('prescriptions'),DB.list('messages'),DB.list('invoices')]);const unread=msgs.filter(x=>x.sender==='patient'&&!x.read_at).length;const unpaid=invs.filter(i=>i.status==='sent'||i.status==='overdue').reduce((a,i)=>a+i.amount_cents+(i.tax_cents||0),0);
+  const today=new Date().toDateString();const todays=appts.filter(a=>new Date(a.start_at).toDateString()===today&&a.status!=='cancelled').sort((a,b)=>a.start_at.localeCompare(b.start_at));
+  const unsigned=encs.filter(e=>!e.signed_at).length;const newReq=reqs.filter(r=>r.status==='new').length;const pendingFax=fax.filter(f=>!/sent|delivered/i.test(f.status)).length;
+  const pname=id=>{const p=pts.find(x=>x.id===id);return p?`${p.last_name}, ${p.first_name}`:'—'};
+  m.innerHTML=`<div class="page-h"><div><h1>Today</h1><div class="sub">${new Date().toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div>
+   <div class="row"><a class="btn ghost" href="#/patients">+ Patient</a><a class="btn gold" href="#/schedule">+ Appointment</a></div></div>
+  <div class="grid g6" style="margin-bottom:1rem">
+    <div class="card kpi"><b>${todays.length}</b><span>Appointments today</span></div>
+    <div class="card kpi"><b>${unsigned}</b><span>Unsigned notes</span></div>
+    <div class="card kpi"><b>${newReq}</b><span>New web requests</span></div>
+    <div class="card kpi"><b>${pendingFax}</b><span>Faxes pending</span></div>
+    <div class="card kpi"><b>${unread}</b><span>Unread patient messages</span></div>
+    <div class="card kpi"><b>$${(unpaid/100).toFixed(0)}</b><span>Outstanding invoices</span></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><div class="card-h"><h3>Schedule</h3><a class="small" href="#/schedule">Open schedule</a></div>
+      ${todays.length?`<div class="table-wrap"><table><tbody>${todays.map(a=>`<tr class="click" onclick="location.hash='#/patient/${a.patient_id}/appointments'"><td class="mono">${new Date(a.start_at).toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'})}</td><td><b>${esc(pname(a.patient_id))}</b><br><span class="small muted">${esc(a.type)} · ${esc(a.reason||'')}</span></td><td><span class="pill ${a.mode==='virtual'?'info':'mute'}">${esc(a.mode)}</span></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nothing booked today.</div>'}
+    </div>
+    <div class="card"><div class="card-h"><h3>Recent notes</h3><a class="small" href="#/patients">All patients</a></div>
+      ${encs.length?`<div class="table-wrap"><table><tbody>${encs.slice(0,6).map(e=>`<tr class="click" onclick="location.hash='#/patient/${e.patient_id}/notes'"><td><b>${esc(pname(e.patient_id))}</b><br><span class="small muted">${esc(e.type)} · ${fmtDT(e.created_at)}</span></td><td>${e.signed_at?'<span class="pill ok">Signed</span>':'<span class="pill warn">Draft</span>'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No notes yet.</div>'}
+    </div>
+  </div>
+  ${!DEMO?'':'<div class="notice info" style="margin-top:1rem">You are in demo mode. Everything works, but data lives only in this browser. Connect Supabase (Settings → Backend) to make it real.</div>'}`;
+}
+
+/* ================= SCHEDULE ================= */
+async function pageSchedule(m,day){
+  const pts=await DB.list('patients');const appts=await DB.list('appointments');
+  const d=day||(new Date()).toISOString().slice(0,10);
+  const list=appts.filter(a=>a.start_at.slice(0,10)===d).sort((a,b)=>a.start_at.localeCompare(b.start_at));
+  const pname=id=>{const p=pts.find(x=>x.id===id);return p?`${p.last_name}, ${p.first_name}`:'—'};
+  m.innerHTML=`<div class="page-h"><div><h1>Schedule</h1><div class="sub">Appointments, virtual rooms and facility blocks</div></div>
+   <div class="row"><input type="date" id="s-day" value="${d}" style="width:auto"><button class="btn gold" id="s-new">+ Appointment</button></div></div>
+  <div class="card">${list.length?`<div class="table-wrap"><table><thead><tr><th>Time</th><th>Patient</th><th>Type</th><th>Reason</th><th>Status</th><th></th></tr></thead><tbody>
+  ${list.map(a=>`<tr><td class="mono">${new Date(a.start_at).toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'})}<br><span class="small muted">${a.duration_min} min</span></td><td><a href="#/patient/${a.patient_id}">${esc(pname(a.patient_id))}</a></td><td>${esc(a.type)}<br><span class="pill ${a.mode==='virtual'?'info':'mute'}">${esc(a.mode)}</span></td><td>${esc(a.reason||'')}</td><td><span class="pill ${a.status==='completed'?'ok':a.status==='cancelled'?'bad':'warn'}">${esc(a.status)}</span></td>
+   <td class="row" style="justify-content:flex-end">${a.mode==='virtual'?`<button class="btn sm" data-video="${a.id}">${a.video_url?'Join video':'Start video'}</button>`:''}<button class="btn ghost sm" data-note="${a.patient_id}">Note</button><select class="sm" data-status="${a.id}" style="width:auto;min-height:32px;padding:.2rem .4rem"><option ${a.status==='booked'?'selected':''}>booked</option><option ${a.status==='arrived'?'selected':''}>arrived</option><option ${a.status==='completed'?'selected':''}>completed</option><option ${a.status==='no-show'?'selected':''}>no-show</option><option ${a.status==='cancelled'?'selected':''}>cancelled</option></select></td></tr>`).join('')}
+  </tbody></table></div>`:'<div class="empty">No appointments on this day.</div>'}</div>`;
+  $('#s-day').addEventListener('change',e=>pageSchedule(m,e.target.value));
+  $('#s-new').addEventListener('click',()=>apptForm(pts,null,()=>pageSchedule(m,d)));
+  $$('[data-status]',m).forEach(s=>s.addEventListener('change',async e=>{await DB.update('appointments',s.dataset.status,{status:e.target.value});toast('Status updated');}));
+  $$('[data-note]',m).forEach(b=>b.addEventListener('click',()=>{location.hash='#/patient/'+b.dataset.note+'/notes';}));
+  $$('[data-video]',m).forEach(b=>b.addEventListener('click',()=>startVideo(b.dataset.video,()=>pageSchedule(m,d))));
+}
+function apptForm(pts,a,done,presetPatient){
+  const d=a?new Date(a.start_at):new Date();d.setSeconds(0,0);
+  const local=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  const mm=modal(`<h2>${a?'Edit':'New'} appointment</h2><div class="form">
+   <label>Patient<select id="a-p">${pts.map(p=>`<option value="${p.id}" ${(a?.patient_id||presetPatient)===p.id?'selected':''}>${esc(p.last_name)}, ${esc(p.first_name)} (${fmtD(p.dob)})</option>`).join('')}</select></label>
+   <div class="g3"><label>Start<input type="datetime-local" id="a-start" value="${local}"></label><label>Duration (min)<input type="number" id="a-dur" value="${a?.duration_min||30}"></label><label>Mode<select id="a-mode"><option ${a?.mode==='virtual'?'selected':''}>virtual</option><option ${a?.mode==='facility'?'selected':''}>facility</option><option ${a?.mode==='in-person'?'selected':''}>in-person</option><option ${a?.mode==='phone'?'selected':''}>phone</option></select></label></div>
+   <div class="g2"><label>Type<select id="a-type">${['Virtual visit','New patient visit','Follow-up','Prescription renewal','Geriatric assessment','Medication review','Facility visit','Family meeting','Specialist referral'].map(t=>`<option ${a?.type===t?'selected':''}>${t}</option>`).join('')}</select></label><label>Reason<input id="a-reason" value="${esc(a?.reason||'')}"></label></div>
+   <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="a-cancel">Cancel</button><button class="btn gold" id="a-save">Save</button></div></div>`);
+  $('#a-cancel',mm).addEventListener('click',closeModal);
+  $('#a-save',mm).addEventListener('click',async()=>{const row={patient_id:$('#a-p',mm).value,start_at:new Date($('#a-start',mm).value).toISOString(),duration_min:+$('#a-dur',mm).value||30,mode:$('#a-mode',mm).value,type:$('#a-type',mm).value,reason:$('#a-reason',mm).value,status:a?.status||'booked'};if(a)await DB.update('appointments',a.id,row);else await DB.insert('appointments',row);closeModal();toast('Appointment saved');done&&done();});
+}
+async function startVideo(apptId,done){
+  const a=await DB.get('appointments',apptId);let url=a.video_url,provider=a.video_provider,interim=a.video_provider==='jitsi',ownerUrl=a.video_owner_url||'';
+  if(!url){const r=await DB.fn('create-video-room',{appointment_id:apptId});if(!r.ok)throw new Error(r.error||'Could not create room');url=r.url;provider=r.provider;interim=!!r.interim;ownerUrl=r.owner_url||'';await DB.update('appointments',apptId,{video_url:url,video_provider:provider,video_owner_url:ownerUrl});await audit('video_room_created','appointments',apptId,{provider});}
+  const pts=await DB.list('patients');const p=pts.find(x=>x.id===a.patient_id)||{};
+  const joinUrl=ownerUrl||url;
+  const mm=modal(`<h2>Virtual visit · ${esc(p.last_name||'')}, ${esc(p.first_name||'')}</h2>
+   ${interim?'<div class="notice warn"><b>Interim video provider (Jitsi).</b> Encrypted in transit, no account needed. For routine patient visits connect Daily (private rooms, waiting lobby, expiring tokens) in Settings → Backend.</div>':'<div class="notice ok">Private room with waiting lobby. Only you can admit the patient.</div>'}
+   <div class="fieldset"><div class="lg">Before you connect</div>
+    <div class="checks">
+     <label><input type="checkbox" id="c-id" ${a.identity_verified?'checked':''}> Identity confirmed (name and date of birth stated by patient/SDM)</label>
+     <label><input type="checkbox" id="c-consent" ${a.consent_at?'checked':''}> Verbal consent to virtual care obtained: limits of video assessment, privacy of their location, and what to do if the call drops</label>
+     <label><input type="checkbox" id="c-loc"> Patient's physical location and a call-back number recorded (for emergencies)</label>
+    </div>
+    <label>Location / call-back<input id="c-locnote" placeholder="e.g. At home, Sarnia · 519-555-0101" value="${esc(a.consent_note||'')}"></label>
+   </div>
+   <div class="g2 grid"><label>Patient link<input id="v-url" value="${esc(url)}" readonly></label><div class="row" style="align-items:flex-end"><button class="btn ghost" id="v-copy">Copy</button><a class="btn ghost" href="mailto:${esc(p.email||'')}?subject=${encodeURIComponent('Your video visit with PMP Healthcare')}&body=${encodeURIComponent('Hello '+(p.first_name||'')+',\n\nYour video visit is at '+fmtDT(a.start_at)+'. Please join a few minutes early:\n'+url+'\n\nHave your medication list and health card handy. If video fails we will call you.\n\nPMP Healthcare')}">Email link</a></div></div>
+   <div class="row" style="justify-content:space-between"><button class="btn ghost" id="v-close">Close</button><div class="row"><a class="btn ghost" href="${esc(joinUrl)}" target="_blank" rel="noopener" id="v-newtab">Open in new tab</a><button class="btn gold" id="v-embed">Start visit here</button></div></div>
+   <div id="v-frame" class="hidden" style="margin-top:.5rem"><div style="aspect-ratio:16/9;max-width:100%;background:#000;border-radius:8px;overflow:hidden"><iframe id="v-iframe" allow="camera; microphone; fullscreen; display-capture; autoplay" style="border:0;width:100%;height:100%"></iframe></div><div class="row spread" style="margin-top:.5rem"><span class="small muted">Visit started ${fmtDT(now())}. Close this window to end your side of the call.</span><button class="btn sm" id="v-note">Open note</button></div></div>`,true);
+  const saveConsent=async()=>{const patch={identity_verified:$('#c-id',mm).checked,consent_note:$('#c-locnote',mm).value.trim()};if($('#c-consent',mm).checked&&!a.consent_at)patch.consent_at=now();await DB.update('appointments',apptId,patch);if(patch.consent_at)await audit('virtual_consent','appointments',apptId,{identity:patch.identity_verified});};
+  $('#v-copy',mm).addEventListener('click',()=>{navigator.clipboard?.writeText(url).then(()=>toast('Link copied'),()=>{$('#v-url',mm).select()})});
+  $('#v-close',mm).addEventListener('click',async()=>{await saveConsent();closeModal();done&&done();});
+  $('#v-newtab',mm).addEventListener('click',()=>{saveConsent();});
+  $('#v-embed',mm).addEventListener('click',async()=>{if(!$('#c-id',mm).checked||!$('#c-consent',mm).checked){toast('Confirm identity and consent before starting');return;}await saveConsent();$('#v-frame',mm).classList.remove('hidden');$('#v-iframe',mm).src=joinUrl;$('#v-embed',mm).disabled=true;await DB.update('appointments',apptId,{status:'arrived'});});
+  $('#v-note',mm)?.addEventListener('click',()=>{const consentLine=`Virtual visit by secure video (${provider}). Identity confirmed; verbal consent to virtual care obtained; patient location: ${$('#c-locnote',mm).value.trim()||'recorded'}.`;closeModal();noteForm(p,null,()=>{location.hash=`#/patient/${p.id}/notes`;render();},{type:'Virtual visit',title:a.type||'Virtual visit',body:'ASSESSMENT / IMPRESSION\n\n\nNOTE\n'+consentLine+'\n\n\nORDERS\n1. \n\nMONITORING\n\n\nRATIONALE\n'});});
+}
+
+/* ================= FAX (any document) ================= */
+function notePdf(p,e){
+  if(!window.jspdf){toast('PDF library not loaded.');throw new Error('jsPDF unavailable');}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'letter'});const c=CFG.clinic||{};let y=18;
+  doc.setFont('helvetica','bold');doc.setFontSize(14);doc.text(c.name||'PMP Healthcare Corp.',18,y);doc.setFont('helvetica','normal');doc.setFontSize(9);y+=5;doc.text(`${c.address||''}   Tel ${c.phone||'—'}   Fax ${c.fax||'—'}   ${c.email||''}`,18,y);y+=4;doc.setDrawColor(200);doc.line(18,y,198,y);y+=7;
+  doc.setFontSize(12);doc.setFont('helvetica','bold');doc.text(e.title||e.type,18,y);y+=6;doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text(`Patient: ${p.last_name}, ${p.first_name}   DOB ${p.dob||'—'}   ${p.facility?'Facility: '+p.facility:''}`,18,y);y+=5;doc.text(`Encounter: ${fmtDT(e.created_at)}   Type: ${e.type}`,18,y);y+=7;
+  doc.setFontSize(10);const lines=doc.splitTextToSize(e.body||'',175);
+  for(const ln of lines){if(y>255){doc.addPage();y=18;}doc.text(ln,18,y);y+=5;}
+  (e.addenda||[]).forEach(a=>{if(y>240){doc.addPage();y=18;}y+=3;doc.setFont('helvetica','bold');doc.text(`Addendum ${fmtDT(a.at)} · ${a.by}`,18,y);y+=5;doc.setFont('helvetica','normal');for(const ln of doc.splitTextToSize(a.text,175)){if(y>255){doc.addPage();y=18;}doc.text(ln,18,y);y+=5;}});
+  if(y>240){doc.addPage();y=18;}y+=6;doc.setFont('helvetica','bold');doc.text(`${e.signed_by||''}`,18,y);y+=5;doc.setFont('helvetica','normal');doc.text(`Nurse Practitioner · CNO Reg. No. ${session.profile?.cno_number||''} · Electronically signed ${fmtDT(e.signed_at)}`,18,y);
+  doc.setFontSize(8);doc.setTextColor(110);doc.text('Confidential personal health information (PHIPA, Ontario). Intended only for the addressee. If received in error, notify the sender and destroy.',18,268,{maxWidth:180});
+  return doc;
+}
+function faxDialog(o){
+  const mm=modal(`<h2>Fax · ${esc(o.title)}</h2><div class="form">
+   <div class="g2"><label>Recipient<input id="fx-name" value="${esc(o.defaultToName||'')}" placeholder="e.g. Dr. Example, family physician"></label><label>Fax number<input id="fx-num" value="${esc(o.defaultTo||'')}" placeholder="519-555-0100"></label></div>
+   <label>Subject (cover sheet)<input id="fx-subj" value="${esc(o.subject||o.title)}"></label>
+   <div class="notice info">The cover sheet is marked confidential. Patient: ${esc(o.patient.last_name)}, ${esc(o.patient.first_name)}. Confirm the number verbally the first time you fax a new recipient.</div>
+   <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="fx-cancel">Cancel</button><button class="btn ghost" id="fx-preview">Preview PDF</button><button class="btn gold" id="fx-send">Send fax</button></div></div>`);
+  $('#fx-cancel',mm).addEventListener('click',closeModal);
+  $('#fx-preview',mm).addEventListener('click',async()=>{try{const r=await o.makePdf();if(r&&r.output)r.output('dataurlnewwindow');else toast('Preview available after upload in real mode');}catch(e){}});
+  $('#fx-send',mm).addEventListener('click',async()=>{const num=$('#fx-num',mm).value.trim();if(num.replace(/\D/g,'').length<10)return toast('Enter a 10-digit fax number');let b64;try{const r=await o.makePdf();b64=(r&&r.output)?r.output('datauristring').split(',')[1]:r;}catch(e){return;}try{const res=await DB.fn('send-fax',{ref_type:o.ref_type,ref_id:o.ref_id,to_fax:num,to_name:$('#fx-name',mm).value.trim(),subject:$('#fx-subj',mm).value.trim(),filename:`${o.ref_type}-${o.patient.last_name}-${(o.ref_id||'').slice(0,8)}.pdf`,pdf_base64:b64});if(!res.ok)throw new Error(res.error||'Fax failed');await audit('fax_sent',o.ref_type,o.ref_id,{to:num,status:res.job?.status});closeModal();toast(res.job?.status==='queued_local'?'Queued: the clinic fax server will send it within a minute':'Fax sent');render();}catch(e){toast('Fax error: '+(e.message||e));}});
+}
+
+/* ================= SECURE MESSAGES ================= */
+async function pageMessages(m,threadId){
+  const [threads,pts,msgs]=await Promise.all([DB.list('message_threads'),DB.list('patients'),DB.list('messages')]);
+  const pn=id=>{const p=pts.find(x=>x.id===id);return p?`${p.last_name}, ${p.first_name}`:'—'};
+  const unreadIn=t=>msgs.filter(x=>x.thread_id===t.id&&x.sender==='patient'&&!x.read_at).length;
+  m.innerHTML=`<div class="page-h"><div><h1>Secure messages</h1><div class="sub">Patients get an email with a link only; they confirm date of birth to read. Nothing clinical travels by email.</div></div><button class="btn gold" id="msg-new">+ New message</button></div>
+  <div class="grid" style="grid-template-columns:minmax(260px,1fr) 2fr">
+   <div class="card"><div class="card-h"><h3>Threads</h3></div>${threads.length?`<div class="table-wrap"><table><tbody>${threads.sort((a,b)=>(b.last_message_at||'').localeCompare(a.last_message_at||'')).map(t=>`<tr class="click ${t.id===threadId?'on':''}" onclick="location.hash='#/messages/${t.id}'"><td><b>${esc(pn(t.patient_id))}</b>${unreadIn(t)?` <span class="pill warn">${unreadIn(t)} new</span>`:''}<br><span class="small muted">${esc(t.subject)} · ${fmtDT(t.last_message_at)}</span></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No threads yet.</div>'}</div>
+   <div class="card" id="thread-pane"><div class="empty">Select a thread.</div></div>
+  </div>`;
+  $('#msg-new').addEventListener('click',()=>{const mm=modal(`<h2>New secure message</h2><label>Patient<select id="mp">${pts.map(p=>`<option value="${p.id}">${esc(p.last_name)}, ${esc(p.first_name)}</option>`).join('')}</select></label><div class="row" style="justify-content:flex-end;margin-top:1rem"><button class="btn ghost" id="c">Cancel</button><button class="btn gold" id="ok">Continue</button></div>`);$('#c',mm).addEventListener('click',closeModal);$('#ok',mm).addEventListener('click',()=>{const p=pts.find(x=>x.id===$('#mp',mm).value);closeModal();messageCompose(p,{},r=>{location.hash='#/messages/'+r.thread_id;render();});});});
+  if(threadId){const t=threads.find(x=>x.id===threadId);if(t){const p=pts.find(x=>x.id===t.patient_id);await drawThread($('#thread-pane'),t,p,msgs.filter(x=>x.thread_id===t.id));}}
+}
+async function drawThread(el,t,p,list){
+  list=list.slice().sort((a,b)=>a.created_at.localeCompare(b.created_at));
+  const docs=await DB.list('documents',{patient_id:p.id});
+  el.innerHTML=`<div class="card-h"><div><h3>${esc(t.subject)}</h3><div class="small muted">To ${esc(t.recipient_name||'')} &lt;${esc(t.recipient_email||'')}&gt; · <a href="#/patient/${p.id}">${esc(p.last_name)}, ${esc(p.first_name)}</a></div></div><span class="pill ${t.status==='open'?'ok':'mute'}">${esc(t.status)}</span></div>
+  <div class="card-b">${list.map(x=>`<div style="margin-bottom:1rem;padding-left:1rem;border-left:3px solid ${x.sender==='clinician'?'var(--gold)':'var(--line)'}"><div class="small muted" style="font-weight:700;letter-spacing:.06em;text-transform:uppercase">${x.sender==='clinician'?'You':esc(x.sender_name||'Patient')} · ${fmtDT(x.created_at)}${x.sender==='clinician'?(x.read_at?' · <span class="lock">Read '+fmtDT(x.read_at)+'</span>':' · Unread'):''}</div><div class="note">${esc(x.body)}</div>${x.attachment_document_id?`<div class="small"><span class="chip">Attachment: ${esc((docs.find(d=>d.id===x.attachment_document_id)||{}).filename||'document')}</span></div>`:''}</div>`).join('')||'<div class="empty">Empty thread.</div>'}
+   <div class="form" style="margin-top:1rem"><label>Reply<textarea id="th-body"></textarea></label><div class="row spread"><button class="btn ghost sm" id="th-close">${t.status==='open'?'Close thread':'Reopen'}</button><button class="btn gold" id="th-send">Send secure reply</button></div></div></div>`;
+  for(const x of list.filter(x=>x.sender==='patient'&&!x.read_at)){await DB.update('messages',x.id,{read_at:now()});}
+  $('#th-send',el).addEventListener('click',async()=>{const body=$('#th-body',el).value.trim();if(!body)return;const r=await DB.fn('secure-message-send',{thread_id:t.id,patient_id:p.id,recipient_name:t.recipient_name,recipient_email:t.recipient_email,body});if(!r.ok)return toast(r.error||'Failed');if(!DEMO)await audit('secure_message_sent','messages',r.message?.id||'',{thread:t.id});toast(r.emailed?'Sent; patient notified by email':'Saved. Email not configured: copy the link to the patient');if(!r.emailed&&r.link)showLink(r.link);render();});
+  $('#th-close',el).addEventListener('click',async()=>{await DB.update('message_threads',t.id,{status:t.status==='open'?'closed':'open'});render();});
+}
+function showLink(link){const mm=modal(`<h2>Secure link</h2><p class="small muted">Email notifications are not configured yet (RESEND_API_KEY). Send this link to the patient yourself. It contains no health information; the patient must enter their date of birth to open it.</p><label>Link<input id="lk" value="${esc(link)}" readonly></label><div class="row" style="justify-content:flex-end;margin-top:1rem"><button class="btn ghost" id="cp">Copy</button><button class="btn" id="c">Close</button></div>`);$('#cp',mm).addEventListener('click',()=>{navigator.clipboard?.writeText(link).then(()=>toast('Copied'),()=>$('#lk',mm).select())});$('#c',mm).addEventListener('click',closeModal);}
+async function messageCompose(p,preset,done){
+  const docs=await DB.list('documents',{patient_id:p.id});
+  const sdmEmail=(p.sdm||'').match(/[^\s]+@[^\s]+/)?.[0]||'';
+  const mm=modal(`<h2>Secure message · ${esc(p.last_name)}, ${esc(p.first_name)}</h2><div class="form">
+   ${!p.dob?'<div class="notice bad">This patient has no date of birth on file. The recipient verifies with DOB, so add it first (Edit patient).</div>':''}
+   <div class="g2"><label>Recipient name<input id="m-name" value="${esc(p.first_name+' '+p.last_name)}"></label><label>Recipient email<input id="m-email" list="m-emails" value="${esc(p.email||sdmEmail)}"><datalist id="m-emails">${p.email?`<option value="${esc(p.email)}">`:''}${sdmEmail?`<option value="${esc(sdmEmail)}">`:''}</datalist></label></div>
+   <label>Subject<input id="m-subj" value="${esc(preset.subject||'Follow-up from your visit')}"></label>
+   <label>Message<textarea id="m-body" style="min-height:160px">${esc(preset.body||'')}</textarea></label>
+   <label>Attach a document (optional)<select id="m-att"><option value="">None</option>${docs.map(d=>`<option value="${d.id}" ${preset.attachment_document_id===d.id?'selected':''}>${esc(d.filename)} · ${esc(d.category||'')}</option>`).join('')}</select></label>
+   <div class="notice info">The patient receives an email saying only that a secure message is waiting. The link expires in 14 days and locks after five wrong date-of-birth attempts. Every open is logged.</div>
+   <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="m-cancel">Cancel</button><button class="btn gold" id="m-send" ${!p.dob?'disabled':''}>Send securely</button></div></div>`,true);
+  $('#m-cancel',mm).addEventListener('click',closeModal);
+  $('#m-send',mm).addEventListener('click',async()=>{const email=$('#m-email',mm).value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return toast('Enter a valid email');const body=$('#m-body',mm).value.trim();if(!body)return toast('Message is empty');const r=await DB.fn('secure-message-send',{patient_id:p.id,recipient_name:$('#m-name',mm).value.trim(),recipient_email:email,subject:$('#m-subj',mm).value.trim(),body,attachment_document_id:$('#m-att',mm).value||null});if(!r.ok)return toast(r.error||'Failed');closeModal();toast(r.emailed?'Sent; patient notified by email':'Saved. Copy the link to the patient');if(!r.emailed&&r.link)showLink(r.link);done&&done(r);});
+}
+async function tabMessages(b,p){
+  const threads=await DB.list('message_threads',{patient_id:p.id});const msgs=await DB.list('messages');
+  b.innerHTML=`<div class="row" style="margin-bottom:1rem"><button class="btn gold" id="pm-new">+ Secure message</button></div>${threads.length?threads.map(t=>`<div class="card" style="margin-bottom:1rem"><div class="card-h"><div><h3><a href="#/messages/${t.id}">${esc(t.subject)}</a></h3><div class="small muted">${esc(t.recipient_email||'')} · ${msgs.filter(x=>x.thread_id===t.id).length} messages · last ${fmtDT(t.last_message_at)}</div></div><span class="pill ${t.status==='open'?'ok':'mute'}">${esc(t.status)}</span></div></div>`).join(''):'<div class="card empty">No secure messages yet.</div>'}`;
+  $('#pm-new').addEventListener('click',()=>messageCompose(p,{},r=>{location.hash='#/messages/'+r.thread_id;render();}));
+}
+
+/* ================= PAYMENTS ================= */
+const money=c=>'$'+((c||0)/100).toFixed(2);
+async function pagePayments(m){
+  const [invs,pts,fees]=await Promise.all([DB.list('invoices'),DB.list('patients'),DB.list('fee_schedule')]);
+  const pn=id=>{const p=pts.find(x=>x.id===id);return p?`${p.last_name}, ${p.first_name}`:'—'};
+  const sum=st=>invs.filter(i=>st.includes(i.status)).reduce((a,i)=>a+i.amount_cents+(i.tax_cents||0),0);
+  const month=new Date().toISOString().slice(0,7);const paidMonth=invs.filter(i=>i.status==='paid'&&(i.paid_at||'').slice(0,7)===month).reduce((a,i)=>a+i.amount_cents+(i.tax_cents||0),0);
+  m.innerHTML=`<div class="page-h"><div><h1>Payments</h1><div class="sub">Invoices, pay links, receipts for insurance</div></div><div class="row"><button class="btn ghost" id="pay-fees">Fee schedule</button><button class="btn gold" id="pay-new">+ Invoice</button></div></div>
+  <div class="grid g3" style="margin-bottom:1rem"><div class="card kpi"><b>${money(sum(['sent','overdue']))}</b><span>Outstanding</span></div><div class="card kpi"><b>${money(paidMonth)}</b><span>Collected this month</span></div><div class="card kpi"><b>${invs.filter(i=>i.status==='paid').length}</b><span>Paid invoices</span></div></div>
+  <div class="notice info" style="margin-bottom:1rem"><b>Payment method: Interac e-Transfer</b> to <b>${esc(CFG.payments?.etransferEmail||'clinic@pmphealthcare.ca')}</b>${CFG.payments?.autodeposit?' (Autodeposit on: no security question, lands in the business account automatically)':''}. “Send invoice” gives the patient the amount and the invoice number to quote; when the deposit notice arrives, click “Record payment” and the receipt is issued.${CFG.payments?.cardLinks?'':' Card / Apple Pay / Google Pay links are built in and switched off until Stripe is connected.'}</div>
+  <div class="card"><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Patient</th><th>Service</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${invs.length?invs.map(i=>`<tr><td class="mono">${esc(i.number)}<br><span class="small muted">${fmtD(i.issued_at||i.created_at)}</span></td><td><a href="#/patient/${i.patient_id}/billing">${esc(pn(i.patient_id))}</a></td><td>${esc(i.description)}${i.service_date?`<br><span class="small muted">Service ${fmtD(i.service_date)}</span>`:''}</td><td class="mono">${money(i.amount_cents+(i.tax_cents||0))}${i.tax_cents?`<br><span class="small muted">incl. HST ${money(i.tax_cents)}</span>`:''}</td><td>${invPill(i)}${i.payment_method?`<br><span class="small muted">${esc(i.payment_method)}</span>`:''}</td><td class="row" style="justify-content:flex-end">${invActions(i)}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">No invoices yet.</td></tr>'}</tbody></table></div></div>`;
+  bindInvoiceActions(m,invs,pts);
+  $('#pay-new').addEventListener('click',()=>invoiceForm(pts,fees,null,()=>render()));
+  $('#pay-fees').addEventListener('click',()=>feeScheduleDialog(fees,()=>render()));
+}
+function invPill(i){return {draft:'<span class="pill mute">Draft</span>',sent:'<span class="pill info">Sent</span>',overdue:'<span class="pill bad">Overdue</span>',paid:'<span class="pill ok">Paid</span>',void:'<span class="pill mute">Void</span>',refunded:'<span class="pill warn">Refunded</span>'}[i.status]||esc(i.status);}
+function invActions(i){let h='';if(i.status==='draft')h+=`<button class="btn sm" data-send="${i.id}">Send invoice</button>`;if(i.status==='sent'||i.status==='overdue'){h+=`<button class="btn sm ghost" data-copylink="${i.id}">Instructions</button><button class="btn sm ghost" data-invpdf="${i.id}">Invoice PDF</button><button class="btn sm" data-record="${i.id}">Record payment</button>`;}if(i.status==='paid')h+=`<button class="btn sm ghost" data-receipt="${i.id}">Receipt PDF</button>`;if(i.status!=='paid'&&i.status!=='void')h+=`<button class="btn sm ghost" data-void="${i.id}">Void</button>`;return h;}
+function bindInvoiceActions(root,invs,pts){
+  $$('[data-send]',root).forEach(x=>x.addEventListener('click',async()=>{const inv=invs.find(i=>i.id===x.dataset.send);let payUrl=null;if(CFG.payments?.cardLinks){const r=await DB.fn('create-payment',{invoice_id:inv.id});if(!r.ok)return toast(r.error||'Failed');payUrl=r.pay_url;}else{await DB.update('invoices',inv.id,{status:'sent',issued_at:inv.issued_at||now()});await audit('invoice_sent','invoices',inv.id);}payLinkDialog({...inv,status:'sent'},payUrl,pts);}));
+  $$('[data-copylink]',root).forEach(x=>x.addEventListener('click',()=>{const inv=invs.find(i=>i.id===x.dataset.copylink);payLinkDialog(inv,inv.pay_url,pts);}));
+  $$('[data-invpdf]',root).forEach(x=>x.addEventListener('click',()=>{const inv=invs.find(i=>i.id===x.dataset.invpdf);const p=pts.find(z=>z.id===inv.patient_id);try{invoicePdf(p,inv).output('dataurlnewwindow');}catch(e){}}));
+  $$('[data-record]',root).forEach(x=>x.addEventListener('click',()=>{const inv=invs.find(i=>i.id===x.dataset.record);const mm=modal(`<h2>Record payment · ${esc(inv.number)}</h2><div class="form"><div class="g2"><label>Method<select id="rp-m"><option value="etransfer">Interac e-Transfer</option><option value="cash">Cash</option><option value="card">Card (terminal)</option><option value="cheque">Cheque</option><option value="other">Other</option></select></label><label>Paid on<input type="date" id="rp-d" value="${new Date().toISOString().slice(0,10)}"></label></div><label>Payer name / reference<input id="rp-ref" placeholder="e.g. Jane Sample, e-Transfer ref C1A2B3"></label><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="c">Cancel</button><button class="btn gold" id="ok">Mark paid</button></div></div>`);$('#c',mm).addEventListener('click',closeModal);$('#ok',mm).addEventListener('click',async()=>{const receipt=`R-${inv.number.replace('PMP-','')}-${new Date().getFullYear()}`;await DB.update('invoices',inv.id,{status:'paid',paid_at:new Date($('#rp-d',mm).value).toISOString(),payment_method:$('#rp-m',mm).value,payer_name:$('#rp-ref',mm).value.trim(),receipt_number:receipt});await audit('invoice_paid','invoices',inv.id,{method:$('#rp-m',mm).value});closeModal();toast('Payment recorded. Receipt '+receipt);render();});}));
+  $$('[data-receipt]',root).forEach(x=>x.addEventListener('click',()=>{const inv=invs.find(i=>i.id===x.dataset.receipt);const p=pts.find(z=>z.id===inv.patient_id);try{receiptPdf(p,inv).output('dataurlnewwindow');}catch(e){}}));
+  $$('[data-void]',root).forEach(x=>x.addEventListener('click',async()=>{await DB.update('invoices',x.dataset.void,{status:'void'});render();}));
+}
+function etransferText(inv,p){const e=CFG.payments?.etransferEmail||'clinic@pmphealthcare.ca';const total=money(inv.amount_cents+(inv.tax_cents||0));return `Hello ${p.first_name||''},\n\nThank you for your visit. Invoice ${inv.number}: ${inv.description}${inv.service_date?' ('+fmtD(inv.service_date)+')':''}.\nAmount due: ${total} CAD.\n\nPlease pay by Interac e-Transfer to ${e}.${CFG.payments?.autodeposit?' Autodeposit is enabled, so no security question is needed.':''}\nIn the message field, please enter: ${inv.number}\n\nA receipt showing the Nurse Practitioner's College of Nurses of Ontario registration number will follow for your insurance claim. Nurse Practitioner services are not covered by OHIP.\n\nPMP Healthcare Corp. · Sarnia, Ontario`;}
+function payLinkDialog(inv,url,pts){const p=pts.find(z=>z.id===inv.patient_id)||{};const txt=etransferText(inv,p)+(url?`\n\nPrefer to pay by card, Apple Pay or bank debit? Use this secure link: ${url}`:'');const mm=modal(`<h2>Send invoice · ${esc(inv.number)}</h2><p class="small muted">Copy the instructions into an email or text, or use the buttons. Mark the invoice paid when the e-Transfer deposit notice arrives in ${esc(CFG.payments?.etransferEmail||'the clinic inbox')}.</p><label>Message to patient<textarea id="pl" style="min-height:220px" readonly>${esc(txt)}</textarea></label><div class="row" style="justify-content:flex-end;margin-top:1rem"><button class="btn ghost" id="cp">Copy</button><a class="btn ghost" href="mailto:${esc(inv.payer_email||p.email||'')}?subject=${encodeURIComponent('Invoice '+inv.number+' · PMP Healthcare')}&body=${encodeURIComponent(txt)}">Email</a><a class="btn ghost" href="sms:${esc((p.phone||'').replace(/[^\d+]/g,''))}?&body=${encodeURIComponent('PMP Healthcare invoice '+inv.number+': '+money(inv.amount_cents+(inv.tax_cents||0))+' CAD by Interac e-Transfer to '+(CFG.payments?.etransferEmail||'clinic@pmphealthcare.ca')+', message: '+inv.number)}">Text</a><button class="btn gold" id="c">Done</button></div>`);$('#cp',mm).addEventListener('click',()=>{navigator.clipboard?.writeText(txt).then(()=>toast('Copied'),()=>$('#pl',mm).select())});$('#c',mm).addEventListener('click',()=>{closeModal();render();});}
+function invoicePdf(p,inv){
+  if(!window.jspdf){toast('PDF library not loaded.');throw new Error('jsPDF unavailable');}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'letter'});const c=CFG.clinic||{};const pr=session.profile||{};let y=20;
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text(c.name||'PMP Healthcare Corp.',18,y);doc.setFontSize(18);doc.text('INVOICE',198,y,{align:'right'});y+=6;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(`${c.address||''}   ${c.email||''}   ${c.phone||''}`,18,y);doc.text(`${inv.number} · ${fmtD(inv.issued_at||inv.created_at)}`,198,y,{align:'right'});y+=4;doc.setDrawColor(200);doc.line(18,y,198,y);y+=10;
+  doc.setFontSize(10.5);const row=(k,v)=>{doc.setFont('helvetica','bold');doc.text(k,18,y);doc.setFont('helvetica','normal');doc.text(String(v||''),70,y);y+=6.5;};
+  row('Bill to',`${p.last_name}, ${p.first_name}`);row('Service',inv.description);row('Date of service',inv.service_date||'');row('Amount',`${money(inv.amount_cents)} CAD`);if(inv.tax_cents)row('HST (13%)',`${money(inv.tax_cents)} CAD`);doc.setFont('helvetica','bold');row('Total due',`${money(inv.amount_cents+(inv.tax_cents||0))} CAD`);doc.setFont('helvetica','normal');
+  y+=6;doc.line(18,y,198,y);y+=10;doc.setFont('helvetica','bold');doc.text('How to pay',18,y);y+=6;doc.setFont('helvetica','normal');
+  const e=CFG.payments?.etransferEmail||'clinic@pmphealthcare.ca';for(const ln of doc.splitTextToSize(`Interac e-Transfer to ${e}${CFG.payments?.autodeposit?' (Autodeposit enabled: no security question)':''}. Enter ${inv.number} in the message field. Due on receipt.`,175)){doc.text(ln,18,y);y+=5.5;}
+  y+=10;doc.setFont('helvetica','bold');doc.text('Provider',18,y);y+=6;doc.setFont('helvetica','normal');doc.text(`${pr.display_name||''}, ${pr.credentials||'NP'} · College of Nurses of Ontario Reg. No. ${pr.cno_number||''}`,18,y);
+  y+=14;doc.setFontSize(9);doc.setTextColor(90);doc.text('Nurse Practitioner services are not insured by OHIP. An official receipt for your extended health plan is issued on payment. Nursing services by a registered Nurse Practitioner are HST-exempt; HST is shown only where it applies.',18,y,{maxWidth:180});
+  return doc;
+}
+function invoiceForm(pts,fees,preset,done){
+  const act=fees.filter(f=>f.active!==false);
+  const mm=modal(`<h2>New invoice</h2><div class="form">
+   <label>Patient<select id="iv-p">${pts.map(p=>`<option value="${p.id}" ${preset?.patient_id===p.id?'selected':''}>${esc(p.last_name)}, ${esc(p.first_name)}</option>`).join('')}</select></label>
+   <div class="g2"><label>Service<select id="iv-fee"><option value="">Custom</option>${act.map(f=>`<option value="${f.id}">${esc(f.label)} · ${money(f.amount_cents)}${f.taxable?' + HST':''}</option>`).join('')}</select></label><label>Service date<input type="date" id="iv-date" value="${preset?.service_date||new Date().toISOString().slice(0,10)}"></label></div>
+   <label>Description<input id="iv-desc" value="${esc(preset?.description||'')}"></label>
+   <div class="g3"><label>Amount (CAD)<input type="number" step="0.01" id="iv-amt" value="${preset?.amount?(preset.amount/100).toFixed(2):''}"></label><label>HST applies<select id="iv-tax"><option value="0">No (clinical nursing service, exempt)</option><option value="1">Yes, 13% (notes, forms, non-clinical)</option></select></label><label>Payer email<input id="iv-email" value="${esc(preset?.email||'')}"></label></div>
+   <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="iv-cancel">Cancel</button><button class="btn" id="iv-draft">Save draft</button><button class="btn gold" id="iv-send">Save and send</button></div></div>`);
+  $('#iv-p',mm).addEventListener('change',()=>{const p=pts.find(z=>z.id===$('#iv-p',mm).value);if(p&&!$('#iv-email',mm).value)$('#iv-email',mm).value=p.email||'';});$('#iv-p',mm).dispatchEvent(new Event('change'));
+  $('#iv-fee',mm).addEventListener('change',()=>{const f=fees.find(z=>z.id===$('#iv-fee',mm).value);if(f){$('#iv-desc',mm).value=f.label;$('#iv-amt',mm).value=(f.amount_cents/100).toFixed(2);$('#iv-tax',mm).value=f.taxable?'1':'0';}});
+  $('#iv-cancel',mm).addEventListener('click',closeModal);
+  const save=async send=>{const amt=Math.round(parseFloat($('#iv-amt',mm).value||'0')*100);if(!amt||!$('#iv-desc',mm).value.trim())return toast('Description and amount are required');const tax=$('#iv-tax',mm).value==='1'?Math.round(amt*0.13):0;const row={patient_id:$('#iv-p',mm).value,appointment_id:preset?.appointment_id||null,description:$('#iv-desc',mm).value.trim(),service_date:$('#iv-date',mm).value,amount_cents:amt,tax_cents:tax,currency:'CAD',status:'draft',payer_email:$('#iv-email',mm).value.trim()};if(DEMO){const n=1000+(demo.db.invoices||[]).length+1;row.number='PMP-'+n;}const inv=await DB.insert('invoices',row);closeModal();if(send){let payUrl=null;if(CFG.payments?.cardLinks){const r=await DB.fn('create-payment',{invoice_id:inv.id});payUrl=r.ok?r.pay_url:null;}else{await DB.update('invoices',inv.id,{status:'sent',issued_at:now()});await audit('invoice_sent','invoices',inv.id);}payLinkDialog({...inv,status:'sent'},payUrl,pts);return;}else toast('Draft saved');done&&done(inv);};
+  $('#iv-draft',mm).addEventListener('click',()=>save(false));$('#iv-send',mm).addEventListener('click',()=>save(true));
+}
+function feeScheduleDialog(fees,done){
+  const mm=modal(`<h2>Fee schedule</h2><p class="small muted">Used to pre-fill invoices. Most clinical nursing services are HST-exempt; sick notes and forms are taxable. Confirm with your accountant.</p><div class="table-wrap"><table><thead><tr><th>Code</th><th>Service</th><th>Fee</th><th>HST</th><th></th></tr></thead><tbody id="fs-rows">${fees.map(f=>`<tr><td class="mono">${esc(f.code)}</td><td>${esc(f.label)}</td><td class="mono">${money(f.amount_cents)}</td><td>${f.taxable?'Yes':'No'}</td><td>${f.active===false?'<span class="pill mute">Inactive</span>':`<button class="btn sm ghost" data-off="${f.id}">Deactivate</button>`}</td></tr>`).join('')}</tbody></table></div>
+   <div class="form" style="margin-top:1rem"><div class="g3"><label>Code<input id="fs-code"></label><label>Service<input id="fs-label"></label><label>Fee (CAD)<input type="number" step="0.01" id="fs-amt"></label></div><div class="row spread"><div class="checks"><label><input type="checkbox" id="fs-tax"> HST applies</label></div><div class="row"><button class="btn ghost" id="c">Close</button><button class="btn gold" id="add">Add fee</button></div></div></div>`,true);
+  $('#c',mm).addEventListener('click',()=>{closeModal();done&&done();});
+  $('#add',mm).addEventListener('click',async()=>{const amt=Math.round(parseFloat($('#fs-amt',mm).value||'0')*100);if(!amt||!$('#fs-label',mm).value.trim())return toast('Service and fee required');await DB.insert('fee_schedule',{code:$('#fs-code',mm).value.trim().toUpperCase()||'FEE',label:$('#fs-label',mm).value.trim(),amount_cents:amt,taxable:$('#fs-tax',mm).checked,active:true});closeModal();toast('Fee added');done&&done();});
+  $$('[data-off]',mm).forEach(x=>x.addEventListener('click',async()=>{await DB.update('fee_schedule',x.dataset.off,{active:false});closeModal();done&&done();}));
+}
+function receiptPdf(p,inv){
+  if(!window.jspdf){toast('PDF library not loaded.');throw new Error('jsPDF unavailable');}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'letter'});const c=CFG.clinic||{};const pr=session.profile||{};let y=20;
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text(c.name||'PMP Healthcare Corp.',18,y);doc.setFontSize(18);doc.text('OFFICIAL RECEIPT',198,y,{align:'right'});y+=6;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(`${c.address||''}   ${c.email||''}   ${c.phone||''}`,18,y);doc.text(`Receipt no. ${inv.receipt_number||''}`,198,y,{align:'right'});y+=4;doc.setDrawColor(200);doc.line(18,y,198,y);y+=10;
+  doc.setFontSize(10.5);const row=(k,v)=>{doc.setFont('helvetica','bold');doc.text(k,18,y);doc.setFont('helvetica','normal');doc.text(String(v||''),70,y);y+=6.5;};
+  row('Patient',`${p.last_name}, ${p.first_name}`);row('Date of birth',p.dob||'');row('Service',inv.description);row('Date of service',inv.service_date||'');row('Invoice',inv.number);row('Amount',`${money(inv.amount_cents)} CAD`);if(inv.tax_cents)row('HST (13%)',`${money(inv.tax_cents)} CAD`);doc.setFont('helvetica','bold');row('Total paid',`${money(inv.amount_cents+(inv.tax_cents||0))} CAD`);doc.setFont('helvetica','normal');row('Paid on',fmtD(inv.paid_at));row('Method',({card:'Card',apple_pay:'Apple Pay',google_pay:'Google Pay',pad:'Pre-authorized debit',etransfer:'Interac e-Transfer',cash:'Cash',cheque:'Cheque'})[inv.payment_method]||inv.payment_method||'');if(inv.payer_name)row('Payer / reference',inv.payer_name);
+  y+=8;doc.line(18,y,198,y);y+=10;doc.setFont('helvetica','bold');doc.text('Provider',18,y);y+=6;doc.setFont('helvetica','normal');doc.text(`${pr.display_name||''}, ${pr.credentials||'NP'}`,18,y);y+=5.5;doc.text(`Nurse Practitioner · College of Nurses of Ontario Reg. No. ${pr.cno_number||''}`,18,y);y+=5.5;doc.text(`Issued ${fmtDT(now())}`,18,y);
+  y+=14;doc.setFontSize(9);doc.setTextColor(90);doc.text('Nurse Practitioner services are not insured by the Ontario Health Insurance Plan. Submit this receipt to your extended health benefits plan. Nursing services provided by a registered Nurse Practitioner are exempt from HST; HST is shown only where it applies.',18,y,{maxWidth:180});
+  return doc;
+}
+async function tabBilling(b,p){
+  const [invs,fees,appts]=await Promise.all([DB.list('invoices',{patient_id:p.id}),DB.list('fee_schedule'),DB.list('appointments',{patient_id:p.id})]);
+  const pts=[p];
+  b.innerHTML=`<div class="row" style="margin-bottom:1rem"><button class="btn gold" id="bl-new">+ Invoice</button>${appts.filter(a=>a.status==='completed').slice(0,1).map(a=>`<button class="btn ghost" data-fromappt="${a.id}">Invoice last visit (${esc(a.type)})</button>`).join('')}</div>
+  <div class="card">${invs.length?`<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Service</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${invs.map(i=>`<tr><td class="mono">${esc(i.number)}<br><span class="small muted">${fmtD(i.issued_at||i.created_at)}</span></td><td>${esc(i.description)}</td><td class="mono">${money(i.amount_cents+(i.tax_cents||0))}</td><td>${invPill(i)}</td><td class="row" style="justify-content:flex-end">${invActions(i)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No invoices for this patient.</div>'}</div>`;
+  bindInvoiceActions(b,invs,pts);
+  $('#bl-new').addEventListener('click',()=>invoiceForm(pts,fees,{patient_id:p.id,email:p.email},()=>render()));
+  $$('[data-fromappt]',b).forEach(x=>x.addEventListener('click',()=>{const a=appts.find(z=>z.id===x.dataset.fromappt);const f=fees.find(z=>z.label.toLowerCase().includes((a.type||'').toLowerCase().split(' ')[0]));invoiceForm(pts,fees,{patient_id:p.id,email:p.email,appointment_id:a.id,description:f?f.label:a.type,amount:f?f.amount_cents:0,service_date:a.start_at.slice(0,10)},()=>render());}));
+}
+
+/* ================= PATIENTS ================= */
+async function pagePatients(m){
+  const pts=await DB.list('patients');
+  m.innerHTML=`<div class="page-h"><div><h1>Patients</h1><div class="sub">${pts.length} on file</div></div><div class="row"><input class="search" id="p-q" placeholder="Search name, facility, phone"><button class="btn gold" id="p-new">+ New patient</button></div></div>
+  <div class="card"><div class="table-wrap"><table><thead><tr><th>Name</th><th>DOB / age</th><th>Setting</th><th>Pharmacy fax</th><th>PCP</th></tr></thead><tbody id="p-rows"></tbody></table></div></div>`;
+  const draw=q=>{q=(q||'').toLowerCase();const rows=pts.filter(p=>!q||`${p.first_name} ${p.last_name} ${p.facility} ${p.phone} ${p.setting}`.toLowerCase().includes(q));$('#p-rows').innerHTML=rows.length?rows.map(p=>`<tr class="click" onclick="location.hash='#/patient/${p.id}'"><td><b>${esc(p.last_name)}, ${esc(p.first_name)}</b>${p.allergies&&p.allergies!=='NKDA'?`<br><span class="pill bad">Allergy: ${esc(p.allergies)}</span>`:''}</td><td class="mono">${fmtD(p.dob)} · ${age(p.dob)}</td><td>${esc(p.setting||'')}${p.facility?`<br><span class="small muted">${esc(p.facility)}</span>`:''}</td><td class="mono">${esc(p.pharmacy_fax||'')}</td><td>${esc(p.pcp||'')}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No patients match.</td></tr>';};
+  draw();$('#p-q').addEventListener('input',e=>draw(e.target.value));
+  $('#p-new').addEventListener('click',()=>patientForm(null,p=>{location.hash='#/patient/'+p.id;}));
+}
+function patientForm(p,done){
+  const v=k=>esc(p?.[k]||'');
+  const mm=modal(`<h2>${p?'Edit patient':'New patient'}</h2><div class="form">
+   <div class="g3"><label>First name<input id="f-first" value="${v('first_name')}" required></label><label>Last name<input id="f-last" value="${v('last_name')}" required></label><label>Date of birth<input type="date" id="f-dob" value="${v('dob')}"></label></div>
+   <div class="g3"><label>Sex<select id="f-sex"><option value="">—</option><option ${p?.sex==='F'?'selected':''}>F</option><option ${p?.sex==='M'?'selected':''}>M</option><option ${p?.sex==='X'?'selected':''}>X</option></select></label><label>Health card (optional)<input id="f-hcn" value="${v('hcn')}"></label><label>Phone<input id="f-phone" value="${v('phone')}"></label></div>
+   <div class="g2"><label>Email<input type="email" id="f-email" value="${v('email')}"></label><label>Address<input id="f-address" value="${v('address')}"></label></div>
+   <div class="g3"><label>Setting<select id="f-setting">${['Community (virtual)','Community (in person)','Retirement residence','Long-term care home','Supportive housing'].map(s=>`<option ${p?.setting===s?'selected':''}>${s}</option>`).join('')}</select></label><label>Facility / unit<input id="f-facility" value="${v('facility')}"></label><label>Primary care provider<input id="f-pcp" value="${v('pcp')}"></label></div>
+   <div class="g2"><label>Pharmacy<input id="f-pharm" value="${v('pharmacy_name')}"></label><label>Pharmacy fax<input id="f-pfax" value="${v('pharmacy_fax')}" placeholder="519-555-0100"></label></div>
+   <label>Allergies<input id="f-allergies" value="${v('allergies')}" placeholder="NKDA"></label>
+   <label>Active problems<textarea id="f-problems">${v('problems')}</textarea></label>
+   <label>Current medications (one per line)<textarea id="f-meds">${v('medications')}</textarea></label>
+   <label>SDM / POA / emergency contact<input id="f-sdm" value="${v('sdm')}"></label>
+   <label>Notes (non-clinical)<textarea id="f-notes">${v('notes')}</textarea></label>
+   <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="f-cancel">Cancel</button><button class="btn gold" id="f-save">Save</button></div></div>`,true);
+  $('#f-cancel',mm).addEventListener('click',closeModal);
+  $('#f-save',mm).addEventListener('click',async()=>{const g=id=>$('#'+id,mm).value.trim();if(!g('f-first')||!g('f-last'))return toast('First and last name are required');const row={first_name:g('f-first'),last_name:g('f-last'),dob:g('f-dob'),sex:g('f-sex'),hcn:g('f-hcn'),phone:g('f-phone'),email:g('f-email'),address:g('f-address'),setting:g('f-setting'),facility:g('f-facility'),pcp:g('f-pcp'),pharmacy_name:g('f-pharm'),pharmacy_fax:g('f-pfax'),allergies:g('f-allergies'),problems:g('f-problems'),medications:g('f-meds'),sdm:g('f-sdm'),notes:g('f-notes')};const saved=p?await DB.update('patients',p.id,row):await DB.insert('patients',row);closeModal();toast('Patient saved');done&&done(saved);});
+}
+
+async function pagePatient(m,id,tab){
+  const p=await DB.get('patients',id);if(!p){m.innerHTML='<div class="empty">Patient not found.</div>';return;}
+  const tabs=[['summary','Summary'],['notes','Notes'],['assessments','Assessments'],['documents','Documents'],['rx','Prescriptions'],['appointments','Appointments'],['messages','Messages'],['billing','Billing']];
+  m.innerHTML=`<div class="page-h"><div><div class="small muted"><a href="#/patients">Patients</a> / </div><h1>${esc(p.last_name)}, ${esc(p.first_name)}</h1><div class="sub mono">${p.sex||''} · DOB ${fmtD(p.dob)} (${age(p.dob)}) · ${esc(p.setting||'')}${p.facility?' · '+esc(p.facility):''}${p.allergies?` · <b style="color:var(--bad)">Allergies: ${esc(p.allergies)}</b>`:''}</div></div>
+   <div class="row"><button class="btn ghost" id="pt-edit">Edit</button><button class="btn ghost" id="pt-appt">+ Appointment</button><button class="btn gold" id="pt-note">+ Note</button></div></div>
+  <div class="tabs">${tabs.map(t=>`<a href="#/patient/${id}/${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</a>`).join('')}</div><div id="pt-body"></div>`;
+  $('#pt-edit').addEventListener('click',()=>patientForm(p,()=>render()));
+  $('#pt-appt').addEventListener('click',async()=>apptForm(await DB.list('patients'),null,()=>render(),id));
+  $('#pt-note').addEventListener('click',()=>noteForm(p,null,()=>{location.hash=`#/patient/${id}/notes`;render();}));
+  const b=$('#pt-body');
+  if(tab==='summary')await tabSummary(b,p);else if(tab==='notes')await tabNotes(b,p);else if(tab==='assessments')await tabAssess(b,p);else if(tab==='documents')await tabDocs(b,p);else if(tab==='rx')await tabRx(b,p);else if(tab==='appointments')await tabAppts(b,p);else if(tab==='messages')await tabMessages(b,p);else if(tab==='billing')await tabBilling(b,p);
+}
+async function tabSummary(b,p){
+  const [encs,rx,docs]=await Promise.all([DB.list('encounters',{patient_id:p.id}),DB.list('prescriptions',{patient_id:p.id}),DB.list('documents',{patient_id:p.id})]);
+  b.innerHTML=`<div class="grid g2">
+   <div class="card"><div class="card-h"><h3>Active problems</h3></div><div class="card-b note">${esc(p.problems||'—')}</div></div>
+   <div class="card"><div class="card-h"><h3>Current medications</h3></div><div class="card-b note">${esc(p.medications||'—')}</div></div>
+   <div class="card"><div class="card-h"><h3>Contacts</h3></div><div class="card-b small"><div><b>Phone</b> ${esc(p.phone||'—')}</div><div><b>Email</b> ${esc(p.email||'—')}</div><div><b>Address</b> ${esc(p.address||'—')}</div><div><b>SDM / POA</b> ${esc(p.sdm||'—')}</div><div><b>Primary care</b> ${esc(p.pcp||'—')}</div><div><b>Pharmacy</b> ${esc(p.pharmacy_name||'—')} · fax ${esc(p.pharmacy_fax||'—')}</div></div></div>
+   <div class="card"><div class="card-h"><h3>Activity</h3></div><div class="card-b small"><div>${encs.length} notes · ${rx.length} prescriptions · ${docs.length} documents</div>${encs[0]?`<div class="muted">Last note ${fmtDT(encs[0].created_at)} (${esc(encs[0].type)})</div>`:''}<div class="muted">Record created ${fmtD(p.created_at)}</div></div></div>
+  </div>`;
+}
+/* ---- Notes ---- */
+async function tabNotes(b,p){
+  const encs=await DB.list('encounters',{patient_id:p.id});
+  b.innerHTML=encs.length?encs.map(e=>`<div class="card" style="margin-bottom:1rem"><div class="card-h"><div><h3>${esc(e.title||e.type)}</h3><div class="small muted">${esc(e.type)} · ${fmtDT(e.created_at)}</div></div><div class="row">${e.signed_at?`<span class="pill ok">Signed</span>`:`<span class="pill warn">Draft</span><button class="btn sm ghost" data-edit="${e.id}">Edit</button><button class="btn sm" data-sign="${e.id}">Sign & lock</button>`}${e.signed_at?`<button class="btn sm ghost" data-addendum="${e.id}">Addendum</button><button class="btn sm ghost" data-faxnote="${e.id}">Fax</button>`:''}</div></div>
+   <div class="card-b"><div class="note">${esc(e.body)}</div>${(e.addenda||[]).map(a=>`<div class="sig"><b>Addendum</b> ${fmtDT(a.at)} · ${esc(a.by)}<div class="note" style="margin-top:.3rem">${esc(a.text)}</div></div>`).join('')}${e.signed_at?`<div class="sig lock">Electronically signed by ${esc(e.signed_by)} on ${fmtDT(e.signed_at)}. Locked.</div>`:''}</div></div>`).join(''):'<div class="card empty">No notes yet. Use “+ Note”.</div>';
+  $$('[data-edit]',b).forEach(x=>x.addEventListener('click',async()=>noteForm(p,await DB.get('encounters',x.dataset.edit),()=>render())));
+  $$('[data-sign]',b).forEach(x=>x.addEventListener('click',async()=>{const mm=modal(`<h2>Sign and lock this note?</h2><p class="muted">Once signed, the note cannot be edited. Corrections are recorded as addenda.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="c">Cancel</button><button class="btn gold" id="ok">Sign</button></div>`);$('#c',mm).addEventListener('click',closeModal);$('#ok',mm).addEventListener('click',async()=>{await DB.update('encounters',x.dataset.sign,{signed_at:now(),signed_by:session.profile?.display_name||session.user.email,locked:true});await audit('sign','encounters',x.dataset.sign);closeModal();toast('Note signed');render();});}));
+  $$('[data-faxnote]',b).forEach(x=>x.addEventListener('click',async()=>{const e=await DB.get('encounters',x.dataset.faxnote);faxDialog({title:e.title||e.type,ref_type:'encounter',ref_id:e.id,patient:p,defaultTo:p.pcp||'',makePdf:()=>notePdf(p,e)});}));
+  $$('[data-addendum]',b).forEach(x=>x.addEventListener('click',async()=>{const e=await DB.get('encounters',x.dataset.addendum);const mm=modal(`<h2>Addendum</h2><label>Text<textarea id="ad"></textarea></label><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="c">Cancel</button><button class="btn gold" id="ok">Add</button></div>`);$('#c',mm).addEventListener('click',closeModal);$('#ok',mm).addEventListener('click',async()=>{const t=$('#ad',mm).value.trim();if(!t)return;const add=(e.addenda||[]).concat([{at:now(),by:session.profile?.display_name||session.user.email,text:t}]);await DB.update('encounters',e.id,{addenda:add});await audit('addendum','encounters',e.id);closeModal();render();});}));
+}
+const NOTE_SKELETON='ASSESSMENT / IMPRESSION\n\n\nNOTE\n\n\nORDERS\n1. \n\nMONITORING\n\n\nRATIONALE\n';
+function noteForm(p,e,done,preset){
+  const mm=modal(`<h2>${e?'Edit note':'New note'} · ${esc(p.last_name)}, ${esc(p.first_name)}</h2><div class="form">
+   <div class="g2"><label>Type<select id="n-type">${['Progress note','Virtual visit','New patient visit','Medication review','Facility visit','Phone encounter','Family meeting','Referral letter','Other'].map(t=>`<option ${(e?.type||preset?.type)===t?'selected':''}>${t}</option>`).join('')}</select></label><label>Title<input id="n-title" value="${esc(e?.title||preset?.title||'')}"></label></div>
+   <label>Note (Assessment / Impression → Note → Orders → Monitoring → Rationale)<textarea id="n-body" style="min-height:340px;font-family:ui-monospace,Menlo,monospace;font-size:.88rem">${esc(e?.body||preset?.body||NOTE_SKELETON)}</textarea></label>
+   <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="n-cancel">Cancel</button><button class="btn" id="n-save">Save draft</button><button class="btn gold" id="n-sign">Save and sign</button></div></div>`,true);
+  $('#n-cancel',mm).addEventListener('click',closeModal);
+  const save=async sign=>{const row={patient_id:p.id,type:$('#n-type',mm).value,title:$('#n-title',mm).value.trim(),body:$('#n-body',mm).value};if(sign){row.signed_at=now();row.signed_by=session.profile?.display_name||session.user.email;row.locked=true;}const r=e?await DB.update('encounters',e.id,row):await DB.insert('encounters',row);if(sign)await audit('sign','encounters',r.id);closeModal();toast(sign?'Note signed':'Draft saved');done&&done(r);};
+  $('#n-save',mm).addEventListener('click',()=>save(false));$('#n-sign',mm).addEventListener('click',()=>save(true));
+}
+/* ---- Assessments ---- */
+async function tabAssess(b,p){
+  const list=await DB.list('assessments',{patient_id:p.id});
+  b.innerHTML=`<div class="row" style="margin-bottom:1rem">${Object.entries(T).map(([k,t])=>`<button class="btn ghost sm" data-new="${k}">+ ${t.name}</button>`).join('')}</div>
+  ${list.length?list.map(a=>`<div class="card" style="margin-bottom:1rem"><div class="card-h"><div><h3>${esc(T[a.template]?.name||a.template)}</h3><div class="small muted">${fmtDT(a.created_at)}${a.score_summary?' · '+esc(a.score_summary):''}</div></div><div class="row">${a.signed_at?'<span class="pill ok">Signed</span>':`<button class="btn sm ghost" data-edit="${a.id}">Edit</button><button class="btn sm" data-sign="${a.id}">Sign</button>`}<button class="btn sm ghost" data-tonote="${a.id}">Copy to note</button></div></div><div class="card-b note">${esc(a.narrative)}</div></div>`).join(''):'<div class="card empty">No assessments yet.</div>'}`;
+  $$('[data-new]',b).forEach(x=>x.addEventListener('click',()=>assessForm(p,x.dataset.new,null,()=>render())));
+  $$('[data-edit]',b).forEach(x=>x.addEventListener('click',async()=>{const a=await DB.get('assessments',x.dataset.edit);assessForm(p,a.template,a,()=>render());}));
+  $$('[data-sign]',b).forEach(x=>x.addEventListener('click',async()=>{await DB.update('assessments',x.dataset.sign,{signed_at:now(),signed_by:session.profile?.display_name||session.user.email});await audit('sign','assessments',x.dataset.sign);toast('Assessment signed');render();}));
+  $$('[data-tonote]',b).forEach(x=>x.addEventListener('click',async()=>{const a=await DB.get('assessments',x.dataset.tonote);noteForm(p,null,()=>{location.hash=`#/patient/${p.id}/notes`;render();},{type:'Progress note',title:T[a.template]?.name,body:a.narrative+'\n\nORDERS\n1. \n\nMONITORING\n\n\nRATIONALE\n'});}));
+}
+function scoreSummary(k,v){const bits=[];if(k==='cga'){if(v.moca)bits.push(`MoCA ${v.moca}/30`);if(v.cfs)bits.push(`CFS ${v.cfs}`);if(v.gds)bits.push(`GDS ${v.gds}/15`);if(v.adl)bits.push(`ADL ${v.adl}/6`);if(v.tug)bits.push(`TUG ${v.tug}s`);}if(k==='medrev'){const n=(v.meds||'').split('\n').filter(s=>s.trim()).length;if(n)bits.push(`${n} medications`);if(v.acb)bits.push(`ACB ${v.acb}`);}if(k==='falls'){if(Array.isArray(v.rf))bits.push(`${v.rf.length} risk factors`);if(v.tug)bits.push(`TUG ${v.tug}s`);}if(k==='capacity'&&v.finding)bits.push(v.finding);return bits.join(' · ');}
+function assessForm(p,k,a,done){
+  const t=T[k];const v=a?.data||{};
+  if(k==='medrev'&&!a&&p.medications)v.meds=p.medications;if(k==='cga'&&!a&&p.problems)v.problems=p.problems;if(k==='admission'&&!a){v.meds=p.medications||'';v.allergies=p.allergies||'';}
+  const mm=modal(`<h2>${esc(t.name)} · ${esc(p.last_name)}, ${esc(p.first_name)}</h2><div class="form" id="as-form">
+   ${t.sections.map(s=>`<div class="fieldset"><div class="lg">${esc(s.t)}</div><div class="grid g2">${s.f.map(f=>field(f,v[f.k])).join('')}</div></div>`).join('')}
+   <div class="row spread"><div class="small muted" id="as-score">${esc(scoreSummary(k,v))}</div><div class="row"><button class="btn ghost" id="as-cancel">Cancel</button><button class="btn" id="as-save">Save draft</button><button class="btn gold" id="as-sign">Save and sign</button></div></div></div>`,true);
+  mm.addEventListener('input',()=>{const sc=$('#as-score',mm),f=$('#as-form',mm);if(sc&&f)sc.textContent=scoreSummary(k,readFields(f));});
+  $('#as-cancel',mm).addEventListener('click',closeModal);
+  const save=async sign=>{const data=readFields($('#as-form',mm));const row={patient_id:p.id,template:k,data,narrative:narrative(t,data),score_summary:scoreSummary(k,data)};if(sign){row.signed_at=now();row.signed_by=session.profile?.display_name||session.user.email;}const r=a?await DB.update('assessments',a.id,row):await DB.insert('assessments',row);if(sign)await audit('sign','assessments',r.id);closeModal();toast('Assessment saved');done&&done(r);};
+  $('#as-save',mm).addEventListener('click',()=>save(false));$('#as-sign',mm).addEventListener('click',()=>save(true));
+}
+/* ---- Documents ---- */
+async function tabDocs(b,p){
+  const docs=await DB.list('documents',{patient_id:p.id});
+  b.innerHTML=`<div class="card" style="margin-bottom:1rem"><div class="card-b form"><div class="g3"><label>File<input type="file" id="d-file" accept=".pdf,.jpg,.jpeg,.png,.heic,.doc,.docx,.txt"></label><label>Category<select id="d-cat">${['Lab result','Imaging','Consult / specialist letter','Hospital discharge','Medication list / MAR','Consent','Advance care plan','Referral sent','Correspondence','Other'].map(c=>`<option>${c}</option>`).join('')}</select></label><label>Description<input id="d-desc" placeholder="e.g. CBC, lytes, A1c 2026-10-15"></label></div><div class="row" style="justify-content:flex-end"><button class="btn gold" id="d-up">Upload</button></div>${DEMO?'<div class="small muted">Demo mode stores files in this browser only (keep under ~2 MB each).</div>':'<div class="small muted">Stored encrypted in the documents bucket; links expire after 10 minutes.</div>'}</div></div>
+  <div class="card">${docs.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>File</th><th></th></tr></thead><tbody>${docs.map(d=>`<tr><td class="mono">${fmtD(d.created_at)}</td><td>${esc(d.category)}</td><td>${esc(d.description||'')}</td><td class="small muted">${esc(d.filename)} · ${Math.round((d.size||0)/1024)} KB</td><td class="row" style="justify-content:flex-end"><button class="btn sm ghost" data-open="${d.id}">Open</button>${(d.mime||'').includes('pdf')?`<button class="btn sm ghost" data-faxdoc="${d.id}">Fax</button>`:''}<button class="btn sm ghost" data-senddoc="${d.id}">Send securely</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No documents yet.</div>'}</div>`;
+  $('#d-up').addEventListener('click',async()=>{const f=$('#d-file').files[0];if(!f)return toast('Choose a file first');if(DEMO&&f.size>2.5e6)return toast('Demo mode: file too large (2 MB max)');const path=`${session.user.id}/${p.id}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g,'_')}`;try{await DB.upload(path,f);await DB.insert('documents',{patient_id:p.id,category:$('#d-cat').value,description:$('#d-desc').value.trim(),filename:f.name,size:f.size,mime:f.type,path});toast('Uploaded');render();}catch(e){toast('Upload failed: '+(e.message||e));}});
+  $$('[data-faxdoc]',b).forEach(x=>x.addEventListener('click',async()=>{const d=docs.find(z=>z.id===x.dataset.faxdoc);faxDialog({title:d.description||d.filename,ref_type:'document',ref_id:d.id,patient:p,defaultTo:'',makePdf:async()=>{const url=await DB.fileUrl(d.path);const r=await fetch(url);const blob=await r.blob();return await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(',')[1]);fr.readAsDataURL(blob);});}});}));
+  $$('[data-senddoc]',b).forEach(x=>x.addEventListener('click',()=>messageCompose(p,{attachment_document_id:x.dataset.senddoc,subject:'Document from your visit'},()=>{location.hash=`#/patient/${p.id}/messages`;render();})));
+  $$('[data-open]',b).forEach(x=>x.addEventListener('click',async()=>{const d=docs.find(z=>z.id===x.dataset.open);const url=await DB.fileUrl(d.path);await audit('view','documents',d.id);if(!url)return toast('File not available');const w=window.open();if(w){w.document.write(d.mime&&d.mime.startsWith('image')?`<img src="${url}" style="max-width:100%">`:`<iframe src="${url}" style="border:0;width:100vw;height:100vh"></iframe>`);}else{location.href=url;}}));
+}
+/* ---- Prescriptions ---- */
+const SIGS=['once daily','twice daily','three times daily','four times daily','at bedtime','every morning','every 4 hours as needed','every 6 hours as needed','every 8 hours as needed','weekly','as directed'];
+async function tabRx(b,p){
+  const rxs=await DB.list('prescriptions',{patient_id:p.id});const fax=await DB.list('fax_jobs');
+  b.innerHTML=`<div class="row" style="margin-bottom:1rem"><button class="btn gold" id="rx-new">+ New prescription</button></div>
+  ${rxs.length?rxs.map(r=>{const j=fax.filter(f=>f.prescription_id===r.id)[0];return `<div class="card" style="margin-bottom:1rem"><div class="card-h"><div><h3>Rx ${fmtD(r.created_at)} · ${r.items.length} item${r.items.length>1?'s':''}</h3><div class="small muted">To ${esc(r.pharmacy_name||'')} · fax ${esc(r.pharmacy_fax||'')}</div></div><div class="row">${faxPill(j)}<button class="btn sm ghost" data-pdf="${r.id}">PDF</button><button class="btn sm" data-fax="${r.id}">${j?'Re-send fax':'Fax to pharmacy'}</button></div></div><div class="card-b"><table><tbody>${r.items.map(i=>`<tr><td><b>${esc(i.drug)}</b> ${esc(i.strength)}</td><td>${esc(i.sig)}</td><td class="mono">Qty ${esc(i.qty)} · Rpt ${esc(i.repeats||0)}</td></tr>`).join('')}</tbody></table>${r.notes?`<div class="small muted" style="margin-top:.5rem">${esc(r.notes)}</div>`:''}<div class="sig">Signed ${esc(r.signed_by)} · ${fmtDT(r.created_at)} · CNO ${esc(r.cno_number||'')}</div></div></div>`}).join(''):'<div class="card empty">No prescriptions yet.</div>'}`;
+  $('#rx-new').addEventListener('click',()=>rxForm(p,()=>render()));
+  $$('[data-pdf]',b).forEach(x=>x.addEventListener('click',async()=>{const r=rxs.find(z=>z.id===x.dataset.pdf);try{rxPdf(p,r).output('dataurlnewwindow');}catch(e){}}));
+  $$('[data-fax]',b).forEach(x=>x.addEventListener('click',async()=>{const r=rxs.find(z=>z.id===x.dataset.fax);await sendFax(p,r);render();}));
+}
+function faxPill(j){if(!j)return '<span class="pill mute">Not faxed</span>';const s=j.status||'';if(/delivered|success/i.test(s))return '<span class="pill ok">Delivered</span>';if(/sent_to_provider/.test(s))return '<span class="pill info">Sent</span>';if(/fail|error/i.test(s))return `<span class="pill bad">Fax failed</span>`;if(/no_provider/.test(s))return '<span class="pill warn">Awaiting fax provider</span>';if(/queued_local/.test(s))return '<span class="pill info">Queued on fax server</span>';if(/in_progress/.test(s))return '<span class="pill info">Dialling</span>';return '<span class="pill info">Fax queued</span>';}
+function rxForm(p,done){
+  const lines=[];const mm=modal(`<h2>New prescription · ${esc(p.last_name)}, ${esc(p.first_name)}</h2>
+   ${p.allergies&&p.allergies!=='NKDA'?`<div class="notice bad"><b>Allergies:</b> ${esc(p.allergies)}</div>`:''}
+   <div class="form"><div class="g2"><label>Pharmacy<input id="r-pharm" value="${esc(p.pharmacy_name||'')}"></label><label>Pharmacy fax<input id="r-fax" value="${esc(p.pharmacy_fax||'')}"></label></div>
+   <div id="r-lines"></div><button class="btn ghost sm" id="r-add">+ Add medication</button>
+   <label>Notes to pharmacist<textarea id="r-notes" placeholder="e.g. Taper schedule attached; please blister pack."></textarea></label>
+   <div class="checks"><label><input type="checkbox" id="r-controlled"> Includes a controlled substance (requires original signature; fax only where pharmacy policy allows)</label></div>
+   <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="r-cancel">Cancel</button><button class="btn gold" id="r-save">Sign prescription</button></div></div>`,true);
+  const addLine=()=>{const i=lines.length;lines.push(i);const d=document.createElement('div');d.className='rxline';d.style.marginBottom='.5rem';d.innerHTML=`<label>Drug<input data-d="drug" placeholder="e.g. Amlodipine"></label><label>Strength<input data-d="strength" placeholder="5 mg"></label><label>Directions<input data-d="sig" list="sigs" placeholder="1 tab PO once daily"></label><label>Qty<input data-d="qty" placeholder="30"></label><label>Repeats<input data-d="repeats" type="number" value="0"></label><button class="btn ghost sm" type="button" style="margin-bottom:2px">×</button>`;d.querySelector('button').addEventListener('click',()=>d.remove());$('#r-lines',mm).appendChild(d);};
+  const dl=document.createElement('datalist');dl.id='sigs';dl.innerHTML=SIGS.map(s=>`<option value="${s}">`).join('');mm.appendChild(dl);
+  addLine();$('#r-add',mm).addEventListener('click',addLine);$('#r-cancel',mm).addEventListener('click',closeModal);
+  $('#r-save',mm).addEventListener('click',async()=>{const items=$$('.rxline',mm).map(l=>{const o={};$$('[data-d]',l).forEach(i=>o[i.dataset.d]=i.value.trim());return o;}).filter(i=>i.drug);if(!items.length)return toast('Add at least one medication');const prof=session.profile||{};if(!prof.cno_number)return toast('Add your CNO registration number in Settings first');const r=await DB.insert('prescriptions',{patient_id:p.id,items,notes:$('#r-notes',mm).value.trim(),pharmacy_name:$('#r-pharm',mm).value.trim(),pharmacy_fax:$('#r-fax',mm).value.trim(),controlled:$('#r-controlled',mm).checked,signed_by:prof.display_name,cno_number:prof.cno_number,prescriber_credentials:prof.credentials});await audit('sign','prescriptions',r.id);closeModal();toast('Prescription signed');done&&done(r);});
+}
+function rxPdf(p,r){
+  if(!window.jspdf){toast('PDF library not loaded. Check your internet connection and reload.');throw new Error('jsPDF unavailable');}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'letter'});const c=CFG.clinic||{};let y=18;
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(c.name||'PMP Healthcare Corp.',18,y);doc.setFont('helvetica','normal');doc.setFontSize(9);y+=5;doc.text([c.address||'',`Tel ${c.phone||'—'}  Fax ${c.fax||'—'}  ${c.email||''}`].join('   '),18,y);
+  doc.setFontSize(18);doc.setFont('helvetica','bold');doc.text('PRESCRIPTION',150,18);doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(`Date: ${fmtD(r.created_at)}`,150,24);doc.text(`Rx ID: ${r.id.slice(0,8).toUpperCase()}`,150,29);
+  y+=8;doc.setDrawColor(200);doc.line(18,y,198,y);y+=7;
+  doc.setFont('helvetica','bold');doc.text('Patient',18,y);doc.setFont('helvetica','normal');y+=5;
+  doc.text(`${p.last_name}, ${p.first_name}   DOB ${p.dob||'—'} (${age(p.dob)} y)   ${p.sex||''}`,18,y);y+=5;doc.text(`${p.address||''}   Tel ${p.phone||''}${p.hcn?'   HCN '+p.hcn:''}`,18,y);y+=5;doc.text(`Allergies: ${p.allergies||'not recorded'}`,18,y);y+=5;if(p.facility){doc.text(`Facility: ${p.facility}`,18,y);y+=5;}
+  y+=3;doc.line(18,y,198,y);y+=8;
+  doc.setFontSize(11);
+  r.items.forEach((i,n)=>{doc.setFont('helvetica','bold');doc.text(`${n+1}. ${i.drug} ${i.strength||''}`,18,y);y+=5.5;doc.setFont('helvetica','normal');const sig=doc.splitTextToSize(`Sig: ${i.sig||''}`,165);doc.text(sig,24,y);y+=5*sig.length;doc.text(`Mitte: ${i.qty||''}     Repeats: ${i.repeats||0}`,24,y);y+=9;});
+  if(r.notes){doc.setFontSize(9.5);const nt=doc.splitTextToSize(`Notes to pharmacist: ${r.notes}`,175);doc.text(nt,18,y);y+=5*nt.length+4;}
+  if(r.controlled){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('Contains a controlled substance. Verify with prescriber before dispensing: '+(c.phone||''),18,y);y+=7;}
+  y=Math.max(y+10,215);doc.setDrawColor(120);doc.line(18,y,110,y);y+=5;doc.setFontSize(9.5);doc.setFont('helvetica','bold');doc.text(`${r.signed_by||''}, ${r.prescriber_credentials||'NP'}`,18,y);y+=5;doc.setFont('helvetica','normal');doc.text(`Nurse Practitioner · College of Nurses of Ontario Reg. No. ${r.cno_number||''}`,18,y);y+=5;doc.text(`Electronically signed ${fmtDT(r.created_at)}`,18,y);
+  doc.setFontSize(8);doc.setTextColor(110);doc.text('Confidential: intended only for the pharmacy named. If received in error, notify the sender and destroy. Personal health information protected under PHIPA (Ontario).',18,268,{maxWidth:180});
+  return doc;
+}
+async function sendFax(p,r){
+  if(!r.pharmacy_fax)return toast('No pharmacy fax number on this prescription');
+  let b64;try{const pdf=rxPdf(p,r);b64=pdf.output('datauristring').split(',')[1];}catch(e){return;}
+  try{const res=await DB.fn('send-fax',{ref_type:'prescription',ref_id:r.id,prescription_id:r.id,to_fax:r.pharmacy_fax,to_name:r.pharmacy_name,subject:'Prescription',filename:`Rx-${p.last_name}-${r.id.slice(0,8)}.pdf`,pdf_base64:b64});if(!res.ok)throw new Error(res.error||'Fax failed');await audit('fax_sent','prescriptions',r.id,{to:r.pharmacy_fax,status:res.job?.status});toast(res.job?.status==='queued_local'?'Queued: the clinic fax server will send it within a minute':res.job?.status==='queued_no_provider'?'PDF ready. Fax queued until a provider is connected.':'Fax sent');}catch(e){toast('Fax error: '+(e.message||e));}
+}
+async function pageRx(m){
+  const [rxs,pts,fax]=await Promise.all([DB.list('prescriptions'),DB.list('patients'),DB.list('fax_jobs')]);
+  const pn=id=>{const p=pts.find(x=>x.id===id);return p?`${p.last_name}, ${p.first_name}`:'—'};
+  m.innerHTML=`<div class="page-h"><div><h1>Prescriptions &amp; fax</h1><div class="sub">${rxs.length} prescriptions · ${fax.length} fax jobs</div></div><button class="btn ghost" id="fx-refresh">Refresh fax status</button></div>
+  <div id="fx-server" class="notice info" style="margin-bottom:1rem">Checking the clinic fax server…</div>
+  <div class="card"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Patient</th><th>Items</th><th>Pharmacy</th><th>Fax status</th><th></th></tr></thead><tbody>${rxs.length?rxs.map(r=>{const j=fax.filter(f=>f.prescription_id===r.id)[0];return `<tr><td class="mono">${fmtDT(r.created_at)}</td><td><a href="#/patient/${r.patient_id}/rx">${esc(pn(r.patient_id))}</a></td><td>${r.items.map(i=>esc(i.drug+' '+(i.strength||''))).join('<br>')}</td><td>${esc(r.pharmacy_name||'')}<br><span class="small muted mono">${esc(r.pharmacy_fax||'')}</span></td><td>${faxPill(j)}${j?.detail?`<div class="small muted">${esc(j.detail)}</div>`:''}</td><td><button class="btn sm ghost" data-pdf="${r.id}">PDF</button></td></tr>`}).join(''):'<tr><td colspan="6" class="empty">No prescriptions yet.</td></tr>'}</tbody></table></div></div>`;
+  // Fax server heartbeat (clinic_settings.faxgate_leader written by the iMac/MacBook)
+  (async()=>{const el=$('#fx-server');try{let lease=null;if(DEMO){lease=null;}else{const {data}=await sb.from('clinic_settings').select('value').eq('key','faxgate_leader').maybeSingle();lease=data?.value?JSON.parse(data.value):null;}
+    if(!lease){el.className='notice warn';el.innerHTML=DEMO?'<b>Fax server:</b> not connected in demo mode. Faxes queue here and are sent by PMP FaxGate running on your iMac (primary) or MacBook (standby) once installed (faxgate/README.md).':'<b>Fax server not reporting.</b> Start PMP FaxGate on the iMac or MacBook (it reports every minute). Queued faxes wait until it is back.';return;}
+    const age=Math.round((Date.now()/1000-(lease.ts||0))/60);const ok=age<=3;el.className='notice '+(ok?'ok':'bad');el.innerHTML=`<b>Fax server:</b> ${esc(lease.host||'?')} (${esc(lease.role||'')}) · last heartbeat ${age} min ago · modem ${lease.modem?'connected':'<b>not detected</b>'}${ok?'':' · <b>not responding; the standby Mac takes over automatically if it has the modem</b>'}`;}catch(e){el.className='notice warn';el.textContent='Fax server status unavailable.';}})();
+  // Inbound inbox + other outbound faxes
+  const inboxCard=document.createElement('div');inboxCard.className='card';inboxCard.style.marginTop='1rem';inboxCard.innerHTML='<div class="card-h"><h3>Inbound faxes</h3><button class="btn sm ghost" id="fx-inbox">Check inbox</button></div><div class="card-b small muted" id="fx-inbox-body">Incoming faxes are answered by the clinic fax server, stored here within a minute, and emailed to the clinic mailbox as PDFs (plus a short text to your cell). Click “Check inbox” to refresh and file each one to a patient.</div>';m.appendChild(inboxCard);
+  const others=fax.filter(f=>f.ref_type&&f.ref_type!=='prescription');if(others.length){const oc=document.createElement('div');oc.className='card';oc.style.marginTop='1rem';oc.innerHTML=`<div class="card-h"><h3>Other outbound faxes</h3></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>To</th><th>Subject</th><th>Status</th></tr></thead><tbody>${others.map(f=>`<tr><td class="mono">${fmtDT(f.created_at)}</td><td>${esc(f.ref_type)}</td><td>${esc(f.to_name||'')}<br><span class="small muted mono">${esc(f.to_fax)}</span></td><td>${esc(f.subject||'')}</td><td>${faxPill(f)}</td></tr>`).join('')}</tbody></table></div>`;m.appendChild(oc);}
+  $('#fx-inbox').addEventListener('click',async()=>{const body=$('#fx-inbox-body');body.textContent='Checking…';try{const r=await DB.fn('fax-inbox',{});if(!r.ok)throw new Error(r.error||'Failed');const items=r.items||[];body.className='card-b';body.innerHTML=(r.configured===false?'<div class="notice warn" style="margin-bottom:.8rem">SRFax not connected; showing a sample inbound fax so you can try filing.</div>':'')+(items.length?`<div class="table-wrap"><table><thead><tr><th>Received</th><th>From</th><th>Pages</th><th>Status</th><th></th></tr></thead><tbody>${items.map(f=>`<tr><td class="mono">${fmtDT(f.received_at)}</td><td>${esc(f.from_name||'')}<br><span class="small muted mono">${esc(f.from_number||'')}</span></td><td>${f.pages||''}</td><td>${f.status==='filed'?'<span class="pill ok">Filed</span>':'<span class="pill warn">New</span>'}${f.notified_at?'<br><span class="small muted">Emailed to clinic</span>':''}${f.suggested_patient_id?`<br><span class="small">Likely: ${esc((pts.find(z=>z.id===f.suggested_patient_id)||{}).last_name||'')}</span>`:''}</td><td class="row" style="justify-content:flex-end">${f.storage_path?`<button class="btn sm ghost" data-openfax="${f.id}">Open PDF</button>`:''}${f.status!=='filed'?`<button class="btn sm" data-file="${f.provider_ref}" data-sugg="${f.suggested_patient_id||''}">File to patient</button>`:(f.patient_id?`<a href="#/patient/${f.patient_id}/documents" class="small">Open</a>`:'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Inbox empty.</div>');
+    $$('[data-openfax]',body).forEach(x=>x.addEventListener('click',async()=>{const f=items.find(z=>z.id===x.dataset.openfax);if(DEMO)return toast('Demo: no PDF stored. In real mode this opens the fax.');const url=await DB.fileUrl(f.storage_path);const w=window.open();if(w)w.document.write(`<iframe src="${url}" style="border:0;width:100vw;height:100vh"></iframe>`);}));
+    $$('[data-file]',body).forEach(x=>x.addEventListener('click',()=>{const mm=modal(`<h2>File inbound fax</h2><div class="form"><label>Patient<select id="ff-p">${pts.map(p=>`<option value="${p.id}" ${p.id===x.dataset.sugg?'selected':''}>${esc(p.last_name)}, ${esc(p.first_name)}</option>`).join('')}</select></label><div class="g2"><label>Category<select id="ff-c">${['Lab result','Consult / specialist letter','Hospital discharge','Medication list / MAR','Correspondence','Other'].map(c=>`<option>${c}</option>`).join('')}</select></label><label>Description<input id="ff-d"></label></div><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="c">Cancel</button><button class="btn gold" id="ok">File</button></div></div>`);$('#c',mm).addEventListener('click',closeModal);$('#ok',mm).addEventListener('click',async()=>{const r2=await DB.fn('fax-inbox',{retrieve:x.dataset.file,patient_id:$('#ff-p',mm).value,category:$('#ff-c',mm).value,description:$('#ff-d',mm).value.trim()});if(!r2.ok)return toast(r2.error||'Failed');closeModal();toast('Filed to patient documents');$('#fx-inbox').click();});}));}catch(e){body.textContent='Error: '+(e.message||e);}});
+  $$('[data-pdf]',m).forEach(x=>x.addEventListener('click',async()=>{const r=rxs.find(z=>z.id===x.dataset.pdf);const p=pts.find(z=>z.id===r.patient_id);try{rxPdf(p,r).output('dataurlnewwindow');}catch(e){}}));
+  $('#fx-refresh').addEventListener('click',async()=>{for(const j of fax.filter(f=>f.provider_ref)){try{const s=await DB.fn('fax-status',{job_id:j.id});if(s.ok&&s.status)await DB.update('fax_jobs',j.id,{status:s.status});}catch(e){}}toast('Status refreshed');render();});
+}
+/* ---- Appointments tab ---- */
+async function tabAppts(b,p){
+  const list=(await DB.list('appointments',{patient_id:p.id})).sort((a,c)=>c.start_at.localeCompare(a.start_at));
+  b.innerHTML=`<div class="card">${list.length?`<div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Reason</th><th>Status</th><th></th></tr></thead><tbody>${list.map(a=>`<tr><td class="mono">${fmtDT(a.start_at)}<br><span class="small muted">${a.duration_min} min</span></td><td>${esc(a.type)} <span class="pill ${a.mode==='virtual'?'info':'mute'}">${esc(a.mode)}</span></td><td>${esc(a.reason||'')}</td><td><span class="pill ${a.status==='completed'?'ok':a.status==='cancelled'?'bad':'warn'}">${esc(a.status)}</span></td><td class="row" style="justify-content:flex-end">${a.mode==='virtual'?`<button class="btn sm" data-video="${a.id}">${a.video_url?'Join video':'Start video'}</button>`:''}<button class="btn sm ghost" data-edit="${a.id}">Edit</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No appointments.</div>'}</div>`;
+  $$('[data-video]',b).forEach(x=>x.addEventListener('click',()=>startVideo(x.dataset.video,()=>render())));
+  $$('[data-edit]',b).forEach(x=>x.addEventListener('click',async()=>apptForm(await DB.list('patients'),await DB.get('appointments',x.dataset.edit),()=>render())));
+}
+
+/* ================= WEB REQUESTS ================= */
+async function pageRequests(m){
+  const reqs=await DB.list('web_requests');const pts=await DB.list('patients');
+  m.innerHTML=`<div class="page-h"><div><h1>Web requests</h1><div class="sub">Appointment requests submitted from pmphealthcare.ca</div></div></div>
+  ${reqs.length?reqs.map(r=>`<div class="card" style="margin-bottom:1rem"><div class="card-h"><div><h3>${esc(r.name)} <span class="pill ${r.status==='new'?'warn':r.status==='booked'?'ok':'mute'}">${esc(r.status)}</span></div><div class="small muted">${fmtDT(r.created_at)} · ${esc(r.role||'')} · ${esc(r.request_type||'')}</div></div><div class="row"><a class="btn sm ghost" href="mailto:${esc(r.email)}?subject=${encodeURIComponent('PMP Healthcare: your appointment request')}">Reply by email</a>${r.status==='new'?`<button class="btn sm" data-book="${r.id}">Create patient &amp; book</button><button class="btn sm ghost" data-close="${r.id}">Close</button>`:''}</div></div><div class="card-b small"><div><b>Email</b> ${esc(r.email||'')} · <b>Phone</b> ${esc(r.phone||'')}</div><div class="note" style="margin-top:.4rem">${esc(r.message||'')}</div></div></div>`).join(''):'<div class="card empty">No requests yet. When the website form is connected (DEPLOY.md step 6), submissions appear here with a push to your email.</div>'}`;
+  $$('[data-close]',m).forEach(x=>x.addEventListener('click',async()=>{await DB.update('web_requests',x.dataset.close,{status:'closed'});render();}));
+  $$('[data-book]',m).forEach(x=>x.addEventListener('click',async()=>{const r=reqs.find(z=>z.id===x.dataset.book);const parts=(r.name||'').trim().split(/\s+/);const first=parts.shift()||'',last=parts.join(' ')||'(unknown)';const isSelf=/patient/i.test(r.role||'');const p=await DB.insert('patients',{first_name:isSelf?first:'',last_name:isSelf?last:'',phone:isSelf?r.phone:'',email:isSelf?r.email:'',setting:'Community (virtual)',sdm:isSelf?'':`${r.name} ${r.phone||''} ${r.email||''}`.trim(),notes:`From web request ${fmtD(r.created_at)}: ${r.message||''}`,allergies:'',problems:'',medications:''});await DB.update('web_requests',r.id,{status:'booked',patient_id:p.id});toast(isSelf?'Patient created':'Patient shell created (family contact saved as SDM); add the patient\'s own details');location.hash='#/patient/'+p.id;}));
+}
+
+/* ================= AUDIT ================= */
+async function pageAudit(m){
+  const log=(await DB.list('audit_log')).slice(0,300);
+  m.innerHTML=`<div class="page-h"><div><h1>Audit log</h1><div class="sub">Append-only record of access and changes (latest 300)</div></div></div>
+  <div class="card"><div class="table-wrap"><table class="audit"><thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Table</th><th>Record</th><th>Detail</th></tr></thead><tbody>${log.length?log.map(l=>`<tr><td class="mono">${fmtDT(l.created_at)}</td><td>${esc(l.actor||l.actor_email||'')}</td><td>${esc(l.action)}</td><td>${esc(l.table_name||'')}</td><td class="mono">${esc((l.row_id||'').toString().slice(0,8))}</td><td>${l.meta?esc(JSON.stringify(l.meta)):''}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">Empty.</td></tr>'}</tbody></table></div></div>`;
+}
+
+/* ================= SETTINGS ================= */
+async function pageSettings(m){
+  const pr=session.profile||{};
+  m.innerHTML=`<div class="page-h"><div><h1>Settings</h1><div class="sub">Prescriber details, security and backend</div></div></div>
+  <div class="grid g2">
+   <div class="card"><div class="card-h"><h3>Prescriber</h3></div><div class="card-b form">
+    <label>Display name (appears on notes and prescriptions)<input id="st-name" value="${esc(pr.display_name||'')}"></label>
+    <div class="g2"><label>Credentials<input id="st-cred" value="${esc(pr.credentials||'')}" placeholder="NP-PHC, RN(EC)"></label><label>CNO registration number<input id="st-cno" value="${esc(pr.cno_number||'')}"></label></div>
+    <label>Signature line<input id="st-sig" value="${esc(pr.signature_line||'')}"></label>
+    <div class="row" style="justify-content:flex-end"><button class="btn gold" id="st-save">Save</button></div></div></div>
+   <div class="card"><div class="card-h"><h3>Security</h3></div><div class="card-b form">
+    ${DEMO?'<div class="notice warn">Two-factor authentication is enforced in the real backend (TOTP via authenticator app). Not available in demo mode.</div>':`<div id="mfa-area"><p class="small muted">Two-factor authentication with an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password).</p><button class="btn" id="mfa-enroll">Set up / manage 2FA</button></div>`}
+    <div class="small muted">Sessions expire after inactivity. Every sign-in, view of a document, signature and fax is written to the audit log.</div>
+    <div class="row"><button class="btn ghost" id="st-export">Export my data (JSON)</button>${DEMO?'<button class="btn danger" id="st-reset">Reset demo data</button>':''}</div></div></div>
+   <div class="card" style="grid-column:1/-1"><div class="card-h"><h3>Backend</h3><span class="pill ${DEMO?'warn':'ok'}">${DEMO?'Demo mode':'Connected'}</span></div><div class="card-b small">
+    ${DEMO?`<p>This portal is running without a server. To make it real, follow <b>DEPLOY.md</b>: create a Supabase project in the Canada Central region, run <code>supabase/schema.sql</code>, deploy the four server functions, then paste the project URL and anon key into <code>PMP_CONFIG</code> at the top of <code>index.html</code>. The app switches out of demo mode automatically.</p>`:`<p>Supabase project: <code>${esc(CFG.supabaseUrl)}</code>. Storage bucket <code>documents</code>. Functions: send-fax, fax-inbox, create-video-room, web-request, secure-message-send/-access, create-payment, stripe-webhook.</p>`}
+    <table style="margin-top:.6rem"><tbody>
+     <tr><td>Database, auth, file storage</td><td>${DEMO?'<span class="pill warn">Browser only</span>':'<span class="pill ok">Supabase (Canada Central)</span>'}</td></tr>
+
+     <tr><td>Video</td><td><span class="pill ${DEMO?'warn':'info'}">${DEMO?'Interim: Jitsi rooms':'Daily if DAILY_API_KEY set, else Jitsi interim'}</span></td></tr>
+     <tr><td>Website intake</td><td><span class="pill ${DEMO?'warn':'info'}">${DEMO?'Not connected':'web-request function'}</span></td></tr>
+     <tr><td>Secure messaging (patient link + DOB)</td><td><span class="pill ${DEMO?'warn':'info'}">${DEMO?'Simulated':'secure-message-send / -access; email via RESEND_API_KEY'}</span></td></tr>
+     <tr><td>Payments</td><td><span class="pill ok">Interac e-Transfer to ${esc(CFG.payments?.etransferEmail||'clinic@pmphealthcare.ca')}${CFG.payments?.autodeposit?' · Autodeposit':''}</span> <span class="pill mute">Card links off (Stripe later)</span></td></tr>
+     <tr><td>Fax server (PMP FaxGate, own modem + line)</td><td><span class="pill ${DEMO?'warn':'info'}">${DEMO?'Install on iMac (primary) + MacBook (standby): faxgate/README.md':'provider self · iMac primary, MacBook standby · fax-to-email and email-to-fax'}</span></td></tr>
+     <tr><td>Notifications (email + text to cell)</td><td><span class="pill ${DEMO?'warn':'info'}">${DEMO?'Zoho SMTP + carrier SMS gateway: set SMTP_* and NOTIFY_SMS secrets':'Zoho SMTP · carrier SMS gateway'}</span></td></tr>
+    </tbody></table></div></div>
+  </div>`;
+  $('#st-save').addEventListener('click',async()=>{const patch={display_name:$('#st-name').value.trim(),credentials:$('#st-cred').value.trim(),cno_number:$('#st-cno').value.trim(),signature_line:$('#st-sig').value.trim()};if(DEMO){Object.assign(demo.db.profiles[0],patch);demo.save();session.profile=demo.db.profiles[0];sessionStorage.setItem('pmp_demo_session',JSON.stringify(session));}else{const {data,error}=await sb.from('profiles').update(patch).eq('id',session.user.id).select().single();if(error)return toast(error.message);session.profile=data;}await audit('update','profiles',session.user.id);toast('Saved');});
+  $('#st-export').addEventListener('click',async()=>{const out={};for(const t of TABLES){try{out[t]=await DB.list(t);}catch(e){}}const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pmp-portal-export-${new Date().toISOString().slice(0,10)}.json`;a.click();await audit('export','all','');});
+  $('#st-reset')?.addEventListener('click',()=>{localStorage.removeItem(demo.key);sessionStorage.removeItem('pmp_demo_session');location.reload();});
+  $('#mfa-enroll')?.addEventListener('click',async()=>{const {data:f}=await sb.auth.mfa.listFactors();if(f.totp.length){const mm=modal(`<h2>Two-factor authentication</h2><div class="notice ok">2FA is enabled on this account.</div><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="c">Close</button></div>`);$('#c',mm).addEventListener('click',closeModal);return;}const {data,error}=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'PMP Portal'});if(error)return toast(error.message);const mm=modal(`<h2>Set up two-factor authentication</h2><p class="small">Scan with your authenticator app, then enter the 6-digit code.</p><div style="text-align:center">${data.totp.qr_code}</div><p class="small muted">Manual key: <code>${esc(data.totp.secret)}</code></p><label>Code<input id="mfa-code" inputmode="numeric" maxlength="6"></label><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="c">Cancel</button><button class="btn gold" id="ok">Verify</button></div>`);$('#c',mm).addEventListener('click',closeModal);$('#ok',mm).addEventListener('click',async()=>{const {data:ch,error:e1}=await sb.auth.mfa.challenge({factorId:data.id});if(e1)return toast(e1.message);const {error:e2}=await sb.auth.mfa.verify({factorId:data.id,challengeId:ch.id,code:$('#mfa-code',mm).value.trim()});if(e2)return toast(e2.message);await audit('mfa_enrolled','auth',session.user.id);closeModal();toast('2FA enabled');});});
+}
+
+/* ================= BOOT ================= */
+(async()=>{try{await initAuth();}catch(e){console.error(e);}render();})();
+})();
+</script>
+</body>
+</html>
